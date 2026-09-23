@@ -1,4 +1,5 @@
 using System;
+using Pomo.Shared.Enums;
 
 namespace Pomo.Data.Models
 {
@@ -10,6 +11,6 @@ namespace Pomo.Data.Models
         public string description;
         public string subject;
         public string dueDate;
-        public bool isCompleted;
+        public TaskStatus status;
     }
 }
