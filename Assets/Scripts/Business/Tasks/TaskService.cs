@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using Pomo.Data.Models;
+using Pomo.Data.Repositories;
 using Pomo.Shared.Enums;
 using System.Globalization;
 
@@ -7,6 +9,18 @@ namespace Pomo.Business.Tasks
 {
     public class TaskService
     {
+        private readonly TaskRepository taskRepository;
+
+        public TaskService()
+            : this(new TaskRepository())
+        {
+        }
+
+        public TaskService(TaskRepository taskRepository)
+        {
+            this.taskRepository = taskRepository ?? throw new ArgumentNullException(nameof(taskRepository));
+        }
+
         // Validación de datos antes de crear una tarea
         public TaskValidationResult ValidateTask(
             string title,
@@ -68,7 +82,18 @@ namespace Pomo.Business.Tasks
             newTask.dueDate = dueDate;
             newTask.status = TaskStatus.NotStarted;
 
+            taskRepository.Add(newTask);
             return newTask;
+        }
+
+        public IReadOnlyList<TaskModel> GetStoredTasks()
+        {
+            return taskRepository.GetAll();
+        }
+
+        public void ReloadStoredTasks()
+        {
+            taskRepository.Reload();
         }
     }
 }
