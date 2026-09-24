@@ -5,6 +5,7 @@ namespace Pomo.Shared.Enums
         Valid,
         EmptyTitle,
         EmptySubject,
-        EmptyDueDate
+        EmptyDueDate,
+        InvalidDateFormat
     }
 }

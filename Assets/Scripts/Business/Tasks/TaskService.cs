@@ -1,6 +1,7 @@
 using System;
 using Pomo.Data.Models;
 using Pomo.Shared.Enums;
+using System.Globalization;
 
 namespace Pomo.Business.Tasks
 {
@@ -25,6 +26,13 @@ namespace Pomo.Business.Tasks
             if (string.IsNullOrEmpty(dueDate))
             {
                 return TaskValidationResult.EmptyDueDate;
+            }
+
+            bool isValidDate = DateTime.TryParseExact(dueDate, "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out _);
+
+            if(!isValidDate)
+            {
+                return TaskValidationResult.InvalidDateFormat;
             }
 
             return TaskValidationResult.Valid;
