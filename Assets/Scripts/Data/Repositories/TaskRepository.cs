@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Pomo.Data.DTOs;
 using Pomo.Data.Models;
 using Pomo.Data.Persistence;
+using Pomo.Shared.Utilities;
 
 namespace Pomo.Data.Repositories
 {
@@ -27,6 +28,16 @@ namespace Pomo.Data.Repositories
             return storedTasks.tasks.AsReadOnly();
         }
 
+        public TaskModel GetById(string taskId)
+        {
+            if (string.IsNullOrWhiteSpace(taskId))
+            {
+                return null;
+            }
+
+            return storedTasks.tasks.Find(task => task != null && task.id == taskId);
+        }
+
         public void Add(TaskModel task)
         {
             if (task == null)
@@ -38,11 +49,76 @@ namespace Pomo.Data.Repositories
             SaveChanges();
         }
 
+        public bool Update(TaskModel task)
+        {
+            if (task == null || string.IsNullOrWhiteSpace(task.id))
+            {
+                return false;
+            }
+
+            int taskIndex = storedTasks.tasks.FindIndex(storedTask =>
+                storedTask != null && storedTask.id == task.id);
+
+            if (taskIndex < 0)
+            {
+                return false;
+            }
+
+            storedTasks.tasks[taskIndex] = task;
+            SaveChanges();
+            return true;
+        }
+
+        public bool Delete(string taskId)
+        {
+            if (string.IsNullOrWhiteSpace(taskId))
+            {
+                return false;
+            }
+
+            int removedTasks = storedTasks.tasks.RemoveAll(task =>
+                task != null && task.id == taskId);
+
+            if (removedTasks == 0)
+            {
+                return false;
+            }
+
+            SaveChanges();
+            return true;
+        }
+
         public void Reload()
         {
             if (!storageService.TryLoad(out storedTasks) || storedTasks.tasks == null)
             {
                 storedTasks = new TaskDTO();
+                return;
+            }
+
+            NormalizeStoredDates();
+        }
+
+        private void NormalizeStoredDates()
+        {
+            bool hasChanges = false;
+
+            foreach (TaskModel task in storedTasks.tasks)
+            {
+                if (task == null ||
+                    !DateUtils.TryNormalizeToIso(task.dueDate, out string isoDate) ||
+                    task.dueDate == isoDate)
+                {
+                    continue;
+                }
+
+                task.dueDate = isoDate;
+                hasChanges = true;
+            }
+
+            if (hasChanges)
+            {
+                SaveChanges();
             }
         }
 
