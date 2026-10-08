@@ -12,11 +12,6 @@ using UnityEngine.UI;
 
 namespace Pomo.Presentation.Screens
 {
-    /// <summary>
-    /// Runtime task list used by the Stephen scene. It keeps task interactions
-    /// close to the existing creation form without depending on the visual-only
-    /// scene, and follows the blue, white and warm-accent system from the Canva prototype.
-    /// </summary>
     [DisallowMultipleComponent]
     public class TaskListController : MonoBehaviour
     {
@@ -24,22 +19,28 @@ namespace Pomo.Presentation.Screens
         private static readonly Color Blue = new Color32(47, 112, 176, 255);
         private static readonly Color WarmAccent = new Color32(232, 177, 128, 255);
         private static readonly Color Success = new Color32(76, 145, 105, 255);
+        private static readonly Color Danger = new Color32(184, 68, 68, 255);
         private static readonly Color Surface = new Color32(250, 248, 242, 255);
         private static readonly Color MutedText = new Color32(92, 103, 116, 255);
 
-        private const float CardHeight = 138f;
+        private const float CardHeight = 178f;
         private const float CardSpacing = 12f;
 
         private TaskService taskService;
         private ConfirmationPopup confirmationPopup;
+        private TasksScreenController screenController;
         private GameObject listOverlay;
         private RectTransform content;
         private TMP_Text feedbackText;
 
-        public void Initialize(TaskService service, ConfirmationPopup popup)
+        public void Initialize(
+            TaskService service,
+            ConfirmationPopup popup,
+            TasksScreenController owner)
         {
             taskService = service ?? throw new ArgumentNullException(nameof(service));
             confirmationPopup = popup;
+            screenController = owner ?? throw new ArgumentNullException(nameof(owner));
             EnsureUi();
             RefreshTaskList();
         }
@@ -72,8 +73,9 @@ namespace Pomo.Presentation.Screens
             }
 
             IReadOnlyList<TaskModel> tasks = taskService.GetStoredTasks();
-            float contentHeight = Mathf.Max(360f, 16f + tasks.Count * (CardHeight + CardSpacing));
-            content.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, contentHeight);
+            content.SetSizeWithCurrentAnchors(
+                RectTransform.Axis.Vertical,
+                Mathf.Max(360f, 16f + tasks.Count * (CardHeight + CardSpacing)));
 
             if (tasks.Count == 0)
             {
@@ -165,53 +167,98 @@ namespace Pomo.Presentation.Screens
             cardRect.anchoredPosition = new Vector2(0f, -16f - taskIndex * (CardHeight + CardSpacing));
             cardRect.sizeDelta = new Vector2(0f, CardHeight);
 
-            TMP_Text title = CreateText(task.title, card.transform, 27, Navy, TextAlignmentOptions.Left);
-            SetAnchors(title.rectTransform, new Vector2(0.06f, 0.62f), new Vector2(0.68f, 0.92f));
+            TMP_Text title = CreateText(task.title, card.transform, 25, Navy, TextAlignmentOptions.Left);
+            SetAnchors(title.rectTransform, new Vector2(0.05f, 0.72f), new Vector2(0.52f, 0.94f));
 
-            string dueDate = DateUtils.FormatForUi(task.dueDate);
-            TMP_Text detail = CreateText($"{task.subject}  ·  {dueDate}", card.transform, 20, MutedText, TextAlignmentOptions.Left);
-            SetAnchors(detail.rectTransform, new Vector2(0.06f, 0.34f), new Vector2(0.7f, 0.59f));
+            TMP_Text detail = CreateText(
+                $"{task.subject}  ·  {DateUtils.FormatForUi(task.dueDate)}",
+                card.transform,
+                20,
+                MutedText,
+                TextAlignmentOptions.Left);
+            SetAnchors(detail.rectTransform, new Vector2(0.05f, 0.47f), new Vector2(0.65f, 0.68f));
 
-            TMP_Text status = CreateText(GetStatusLabel(task.status), card.transform, 19, GetStatusColor(task.status), TextAlignmentOptions.Left);
-            SetAnchors(status.rectTransform, new Vector2(0.06f, 0.08f), new Vector2(0.55f, 0.32f));
+            TMP_Text status = CreateText(
+                GetStatusLabel(task),
+                card.transform,
+                19,
+                GetStatusColor(task),
+                TextAlignmentOptions.Left);
+            SetAnchors(status.rectTransform, new Vector2(0.05f, 0.18f), new Vector2(0.65f, 0.43f));
 
             if (task.status == TaskStatus.NotStarted)
             {
-                Button startButton = CreateButton("Iniciar", card.transform, Blue, Color.white, () => RequestStatusChange(task, TaskStatus.InProgress));
-                SetAnchors(startButton.GetComponent<RectTransform>(), new Vector2(0.7f, 0.2f), new Vector2(0.94f, 0.78f));
+                Button startButton = CreateButton(
+                    "Iniciar",
+                    card.transform,
+                    Blue,
+                    Color.white,
+                    () => RequestStatusChange(task, TaskStatus.InProgress));
+                SetAnchors(startButton.GetComponent<RectTransform>(), new Vector2(0.70f, 0.24f), new Vector2(0.95f, 0.55f));
             }
             else if (task.status == TaskStatus.InProgress)
             {
-                Button completeButton = CreateButton("Completar", card.transform, Success, Color.white, () => RequestStatusChange(task, TaskStatus.Completed));
-                SetAnchors(completeButton.GetComponent<RectTransform>(), new Vector2(0.66f, 0.2f), new Vector2(0.94f, 0.78f));
+                Button completeButton = CreateButton(
+                    "Completar",
+                    card.transform,
+                    Success,
+                    Color.white,
+                    () => RequestStatusChange(task, TaskStatus.Completed));
+                SetAnchors(completeButton.GetComponent<RectTransform>(), new Vector2(0.67f, 0.24f), new Vector2(0.95f, 0.55f));
             }
+
+            Button editButton = CreateButton(
+                "Editar",
+                card.transform,
+                WarmAccent,
+                Navy,
+                () => screenController.BeginEdit(task.id));
+            SetAnchors(editButton.GetComponent<RectTransform>(), new Vector2(0.55f, 0.68f), new Vector2(0.74f, 0.93f));
+
+            Button deleteButton = CreateButton(
+                "Eliminar",
+                card.transform,
+                Danger,
+                Color.white,
+                () => RequestDelete(task));
+            SetAnchors(deleteButton.GetComponent<RectTransform>(), new Vector2(0.76f, 0.68f), new Vector2(0.95f, 0.93f));
         }
 
         private void RequestStatusChange(TaskModel task, TaskStatus targetStatus)
         {
             string action = targetStatus == TaskStatus.InProgress ? "iniciar" : "completar";
             string title = targetStatus == TaskStatus.InProgress ? "¿Iniciar tarea?" : "¿Completar tarea?";
-            string message = $"¿Quieres {action} \"{task.title}\"?";
 
-            if (confirmationPopup != null)
+            ShowConfirmation(
+                title,
+                $"¿Quieres {action} \"{task.title}\"?",
+                () => ApplyStatusChange(task.id, targetStatus));
+        }
+
+        private void RequestDelete(TaskModel task)
+        {
+            ShowConfirmation(
+                "¿Eliminar tarea?",
+                $"Esta acción eliminará \"{task.title}\" de forma permanente.",
+                () => ApplyDelete(task.id));
+        }
+
+        private void ShowConfirmation(string title, string message, UnityAction confirmAction)
+        {
+            if (confirmationPopup == null)
             {
-                PrepareConfirmationPopup();
-                confirmationPopup.Show(
-                    title,
-                    message,
-                    () => ApplyStatusChange(task.id, targetStatus),
-                    () => ShowFeedback("Acción cancelada."));
+                ShowFeedback("No se encontró el popup de confirmación.");
                 return;
             }
 
-            ShowFeedback("No se encontró el popup de confirmación.");
+            PrepareConfirmationPopup();
+            confirmationPopup.Show(
+                title,
+                message,
+                confirmAction,
+                () => ShowFeedback("Acción cancelada."));
         }
 
-        /// <summary>
-        /// The popup canvas in the Stephen scene is saved inactive and scaled
-        /// to zero. Restore it only when an action needs confirmation, then
-        /// draw it above the runtime task-list overlay.
-        /// </summary>
         private void PrepareConfirmationPopup()
         {
             for (Transform current = confirmationPopup.transform; current != null; current = current.parent)
@@ -254,6 +301,19 @@ namespace Pomo.Presentation.Screens
                 : "No fue posible actualizar la tarea.");
         }
 
+        private void ApplyDelete(string taskId)
+        {
+            if (!taskService.DeleteTask(taskId))
+            {
+                ShowFeedback("No fue posible eliminar la tarea.");
+                return;
+            }
+
+            ShowFeedback("Tarea eliminada.");
+            screenController.ShowFeedback("Tarea eliminada correctamente.");
+            RefreshTaskList();
+        }
+
         private void ShowFeedback(string message)
         {
             if (feedbackText != null)
@@ -262,29 +322,36 @@ namespace Pomo.Presentation.Screens
             }
         }
 
-        private static string GetStatusLabel(TaskStatus status)
+        private string GetStatusLabel(TaskModel task)
         {
-            switch (status)
+            switch (task.status)
             {
                 case TaskStatus.InProgress:
                     return "En progreso";
                 case TaskStatus.Completed:
                     return "Completada";
                 default:
-                    return "Por iniciar";
+                    if (taskService.IsOverdue(task, DateTimeOffset.Now))
+                    {
+                        return "Vencida";
+                    }
+
+                    return taskService.IsDueSoon(task, DateTimeOffset.Now)
+                        ? "Próxima a vencer"
+                        : "Por iniciar";
             }
         }
 
-        private static Color GetStatusColor(TaskStatus status)
+        private Color GetStatusColor(TaskModel task)
         {
-            switch (status)
+            switch (task.status)
             {
                 case TaskStatus.InProgress:
                     return WarmAccent;
                 case TaskStatus.Completed:
                     return Success;
                 default:
-                    return Blue;
+                    return taskService.IsOverdue(task, DateTimeOffset.Now) ? Danger : Blue;
             }
         }
 
@@ -316,14 +383,19 @@ namespace Pomo.Presentation.Screens
             return text;
         }
 
-        private static Button CreateButton(string label, Transform parent, Color backgroundColor, Color textColor, UnityAction action)
+        private static Button CreateButton(
+            string label,
+            Transform parent,
+            Color backgroundColor,
+            Color textColor,
+            UnityAction action)
         {
             GameObject buttonObject = CreatePanel("Button_" + label, parent, backgroundColor);
             Button button = buttonObject.AddComponent<Button>();
             button.targetGraphic = buttonObject.GetComponent<Image>();
             button.onClick.AddListener(action);
 
-            TMP_Text text = CreateText(label, buttonObject.transform, 22, textColor, TextAlignmentOptions.Center);
+            TMP_Text text = CreateText(label, buttonObject.transform, 20, textColor, TextAlignmentOptions.Center);
             SetAnchors(text.rectTransform, Vector2.zero, Vector2.one);
             return button;
         }

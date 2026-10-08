@@ -69,6 +69,25 @@ namespace Pomo.Data.Repositories
             return true;
         }
 
+        public bool Delete(string taskId)
+        {
+            if (string.IsNullOrWhiteSpace(taskId))
+            {
+                return false;
+            }
+
+            int removedTasks = storedTasks.tasks.RemoveAll(task =>
+                task != null && task.id == taskId);
+
+            if (removedTasks == 0)
+            {
+                return false;
+            }
+
+            SaveChanges();
+            return true;
+        }
+
         public void Reload()
         {
             if (!storageService.TryLoad(out storedTasks) || storedTasks.tasks == null)
