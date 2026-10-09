@@ -7,6 +7,7 @@ namespace Pomo.Data.Models
     {
         public string id;
         public string name;
+        public string taskId;
         public int focusMinutes;
         public int breakMinutes;
         public bool isCustom;

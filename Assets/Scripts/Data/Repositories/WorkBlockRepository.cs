@@ -110,6 +110,15 @@ namespace Pomo.Data.Repositories
             storedBlocks.favoritePresetIds ??= new List<string>();
             storedBlocks.customBlocks ??= new List<WorkBlockModel>();
 
+            if (!storedBlocks.defaultPresetFavoritesInitialized)
+            {
+                AddDefaultFavorite("preset-short");
+                AddDefaultFavorite("preset-medium");
+                AddDefaultFavorite("preset-long");
+                storedBlocks.defaultPresetFavoritesInitialized = true;
+                SaveChanges();
+            }
+
             if (string.IsNullOrWhiteSpace(storedBlocks.selectedBlockId))
             {
                 storedBlocks.selectedBlockId = "preset-short";
@@ -120,6 +129,14 @@ namespace Pomo.Data.Repositories
         private void SaveChanges()
         {
             storageService.Save(storedBlocks);
+        }
+
+        private void AddDefaultFavorite(string blockId)
+        {
+            if (!storedBlocks.favoritePresetIds.Contains(blockId))
+            {
+                storedBlocks.favoritePresetIds.Add(blockId);
+            }
         }
     }
 }

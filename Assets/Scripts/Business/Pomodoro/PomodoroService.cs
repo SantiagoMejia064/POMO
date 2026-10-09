@@ -125,7 +125,7 @@ namespace Pomo.Business.Pomodoro
             return WorkBlockValidationResult.Valid;
         }
 
-        public WorkBlockModel CreateCustomBlock(string name, int focusMinutes, int breakMinutes)
+        public WorkBlockModel CreateCustomBlock(string name, int focusMinutes, int breakMinutes, string taskId = null)
         {
             if (ValidateCustomBlock(name, focusMinutes, breakMinutes) != WorkBlockValidationResult.Valid)
             {
@@ -136,6 +136,7 @@ namespace Pomo.Business.Pomodoro
             {
                 id = Guid.NewGuid().ToString(),
                 name = name.Trim(),
+                taskId = taskId,
                 focusMinutes = focusMinutes,
                 breakMinutes = breakMinutes,
                 isCustom = true,
@@ -165,6 +166,18 @@ namespace Pomo.Business.Pomodoro
 
             customBlock.isFavorite = isFavorite;
             return workBlockRepository.UpdateCustomBlock(customBlock);
+        }
+
+        public bool IsFavorite(string blockId)
+        {
+            WorkBlockModel block = GetBlock(blockId);
+            return block != null && block.isFavorite;
+        }
+
+        public bool ToggleFavorite(string blockId)
+        {
+            WorkBlockModel block = GetBlock(blockId);
+            return block != null && SetFavorite(blockId, !block.isFavorite);
         }
 
         private List<WorkBlockModel> CreatePresetBlocks()
@@ -211,6 +224,7 @@ namespace Pomo.Business.Pomodoro
             {
                 id = block.id,
                 name = block.name,
+                taskId = block.taskId,
                 focusMinutes = block.focusMinutes,
                 breakMinutes = block.breakMinutes,
                 isCustom = block.isCustom,

@@ -9,6 +9,7 @@ namespace Pomo.Data.DTOs
     {
         public string selectedBlockId = "preset-short";
         public List<string> favoritePresetIds = new List<string>();
+        public bool defaultPresetFavoritesInitialized;
         public List<WorkBlockModel> customBlocks = new List<WorkBlockModel>();
     }
 }
