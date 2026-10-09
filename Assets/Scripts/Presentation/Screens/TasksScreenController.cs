@@ -1,7 +1,7 @@
+using System;
 using Pomo.Business.Pomodoro;
 using Pomo.Business.Tasks;
 using Pomo.Data.Models;
-using Pomo.Presentation.Popups;
 using Pomo.Shared.Enums;
 using Pomo.Shared.Utilities;
 using TMPro;
@@ -22,12 +22,58 @@ namespace Pomo.Presentation.Screens
         [Header("Feedback")]
         public TMP_Text feedbackText;
 
+        [Header("Paneles de tareas")]
+        public GameObject taskListPanel;
+        public GameObject taskFormPanel;
+
+        [Header("Lista de tareas")]
+        public RectTransform taskListContent;
+        public GameObject taskItemPrefab;
+
+        [Header("Formulario")]
+        public Button submitTaskButton;
+        public TMP_Text submitTaskButtonLabel;
+        public Button cancelEditButton;
+
+        [Header("Detalle de tarea")]
+        public GameObject taskDetailPanel;
+        public TMP_Text detailTitleText;
+        public TMP_Text detailDescriptionText;
+        public TMP_Text detailSubjectText;
+        public TMP_Text detailDueDateText;
+        public TMP_Text detailStatusText;
+
+        [Header("Campos visuales de detalle")]
+        public TMP_InputField detailTitleInput;
+        public TMP_InputField detailDescriptionInput;
+        public TMP_InputField detailSubjectInput;
+        public TMP_InputField detailDueDateInput;
+
+        [Header("Edición de tarea")]
+        public GameObject editTaskPanel;
+        public TMP_InputField editTitleInput;
+        public TMP_InputField editDescriptionInput;
+        public TMP_InputField editSubjectInput;
+        public TMP_InputField editDueDateInput;
+
+        [Header("Confirmaciones de edición")]
+        public GameObject savedChangesPanel;
+        public GameObject unsavedChangesPanel;
+
+        [Header("Confirmación de eliminación")]
+        public GameObject deleteConfirmationPanel;
+        public TMP_Text deleteConfirmationTitleText;
+        public TMP_Text deleteConfirmationMessageText;
+
+        [Header("Opcional")]
+        public bool initializeWorkBlocks;
+
         private TaskService taskService;
         private TaskListController taskListController;
         private WorkBlocksScreenController workBlocksScreenController;
-        private TMP_Text createButtonLabel;
-        private Button cancelEditButton;
         private string editingTaskId;
+        private string detailTaskId;
+        private Action pendingDeleteAction;
 
         private void Awake()
         {
@@ -36,19 +82,43 @@ namespace Pomo.Presentation.Screens
 
         private void Start()
         {
-            CacheCreateButton();
             SetupTaskList();
-            SetupWorkBlocks();
+
+            if (initializeWorkBlocks)
+            {
+                SetupWorkBlocks();
+            }
+
+            SetEditMode(false);
+
+            if (deleteConfirmationPanel != null)
+            {
+                deleteConfirmationPanel.SetActive(false);
+            }
+
+            if (taskDetailPanel != null)
+            {
+                taskDetailPanel.SetActive(false);
+            }
+
+            if (editTaskPanel != null)
+            {
+                editTaskPanel.SetActive(false);
+            }
+
+            if (savedChangesPanel != null)
+            {
+                savedChangesPanel.SetActive(false);
+            }
+
+            if (unsavedChangesPanel != null)
+            {
+                unsavedChangesPanel.SetActive(false);
+            }
         }
 
         public void CreateTask()
         {
-            if (!string.IsNullOrWhiteSpace(editingTaskId))
-            {
-                SaveEditedTask();
-                return;
-            }
-
             TaskValidationResult validationResult = taskService.ValidateTask(
                 titleInput.text,
                 subjectInput.text,
@@ -74,7 +144,7 @@ namespace Pomo.Presentation.Screens
 
             ClearTaskForm();
             ShowFeedback("Tarea creada correctamente.");
-            taskListController?.ShowList();
+            ShowTaskList();
         }
 
         public void BeginEdit(string taskId)
@@ -87,20 +157,204 @@ namespace Pomo.Presentation.Screens
                 return;
             }
 
+            if (!HasEditInputs())
+            {
+                ShowFeedback("Asigna los inputs de Panel Editar tarea.");
+                return;
+            }
+
             editingTaskId = task.id;
-            titleInput.text = task.title;
-            descriptionInput.text = task.description;
-            subjectInput.text = task.subject;
-            dueDateInput.text = DateUtils.FormatForUi(task.dueDate);
+            detailTaskId = task.id;
+
+            editTitleInput.text = task.title;
+            editDescriptionInput.text = task.description;
+            editSubjectInput.text = task.subject;
+            editDueDateInput.text = DateUtils.FormatForUi(task.dueDate);
             SetEditMode(true);
-            taskListController?.HideList();
+            ShowEditTaskPanel();
             ShowFeedback("Editando tarea. Guarda los cambios o cancela la edición.");
+        }
+
+        public void ShowTaskDetail(string taskId)
+        {
+            TaskModel task = taskService.GetTask(taskId);
+
+            if (task == null)
+            {
+                ShowFeedback("No fue posible encontrar la tarea seleccionada.");
+                return;
+            }
+
+            detailTaskId = task.id;
+
+            SetDetailValue(detailTitleInput, detailTitleText, task.title);
+            SetDetailValue(detailDescriptionInput, detailDescriptionText, task.description);
+            SetDetailValue(detailSubjectInput, detailSubjectText, task.subject);
+            SetDetailValue(detailDueDateInput, detailDueDateText, DateUtils.FormatForUi(task.dueDate));
+            SetDetailValue(null, detailStatusText, GetStatusLabelForDetail(task));
+
+            SetTaskPanels(false, false, true);
+        }
+
+        public void OpenEditSelectedTask()
+        {
+            if (string.IsNullOrWhiteSpace(detailTaskId))
+            {
+                ShowFeedback("No hay una tarea seleccionada para editar.");
+                return;
+            }
+
+            BeginEdit(detailTaskId);
+        }
+
+        public void CloseTaskDetail()
+        {
+            ShowTaskList();
         }
 
         public void CancelEditing()
         {
             ClearTaskForm();
+            ClearEditForm();
             ShowFeedback("Edición cancelada.");
+            ShowTaskList();
+        }
+
+        public void ShowTaskList()
+        {
+            SetTaskPanels(true, false, false);
+
+            taskListController?.RefreshTaskList();
+        }
+
+        public void ShowTaskForm()
+        {
+            SetTaskPanels(false, true, false);
+        }
+
+        public void OpenCreateTaskForm()
+        {
+            ClearTaskForm();
+            ShowTaskForm();
+        }
+
+        public void RequestCloseEdit()
+        {
+            if (string.IsNullOrWhiteSpace(editingTaskId))
+            {
+                ShowTaskList();
+                return;
+            }
+
+            if (unsavedChangesPanel != null)
+            {
+                unsavedChangesPanel.SetActive(true);
+            }
+            else
+            {
+                ShowFeedback("Asigna el panel de cambios sin guardar.");
+            }
+        }
+
+        public void ReturnToEdit()
+        {
+            if (unsavedChangesPanel != null)
+            {
+                unsavedChangesPanel.SetActive(false);
+            }
+
+            ShowEditTaskPanel();
+        }
+
+        public void DiscardChanges()
+        {
+            if (unsavedChangesPanel != null)
+            {
+                unsavedChangesPanel.SetActive(false);
+            }
+
+            ClearEditForm();
+            ShowTaskList();
+        }
+
+        public void CloseSavedChanges()
+        {
+            if (savedChangesPanel != null)
+            {
+                savedChangesPanel.SetActive(false);
+            }
+
+            ShowTaskList();
+        }
+
+        public void ShowDeleteConfirmation(string taskTitle, Action onConfirm)
+        {
+            pendingDeleteAction = onConfirm;
+
+            if (deleteConfirmationTitleText != null)
+            {
+                deleteConfirmationTitleText.text = "¿Eliminar tarea?";
+            }
+
+            if (deleteConfirmationMessageText != null)
+            {
+                deleteConfirmationMessageText.text =
+                    $"¿Deseas eliminar \"{taskTitle}\"? Esta acción no se puede deshacer.";
+            }
+
+            if (deleteConfirmationPanel != null)
+            {
+                deleteConfirmationPanel.SetActive(true);
+            }
+            else
+            {
+                ShowFeedback("Asigna el panel de confirmación de eliminación.");
+            }
+        }
+
+        public void ConfirmDelete()
+        {
+            Action action = pendingDeleteAction;
+            CloseDeleteConfirmation();
+            action?.Invoke();
+        }
+
+        public void RequestDeleteEditingTask()
+        {
+            if (string.IsNullOrWhiteSpace(editingTaskId))
+            {
+                ShowFeedback("No hay una tarea seleccionada para eliminar.");
+                return;
+            }
+
+            TaskModel task = taskService.GetTask(editingTaskId);
+
+            if (task == null)
+            {
+                ShowFeedback("No fue posible encontrar la tarea seleccionada.");
+                return;
+            }
+
+            ShowDeleteConfirmation(task.title, () => DeleteEditingTask(task.id));
+        }
+
+        public void CancelDelete()
+        {
+            CloseDeleteConfirmation();
+            ShowFeedback("Eliminación cancelada.");
+        }
+
+        private void DeleteEditingTask(string taskId)
+        {
+            if (!taskService.DeleteTask(taskId))
+            {
+                ShowFeedback("No fue posible eliminar la tarea.");
+                return;
+            }
+
+            ClearEditForm();
+            ShowTaskList();
+            ShowFeedback("Tarea eliminada correctamente.");
         }
 
         public void StartTask(string taskId)
@@ -146,12 +400,18 @@ namespace Pomo.Presentation.Screens
             }
         }
 
-        private void SaveEditedTask()
+        public void SaveEditedTask()
         {
+            if (string.IsNullOrWhiteSpace(editingTaskId) || !HasEditInputs())
+            {
+                ShowFeedback("No hay una tarea lista para guardar.");
+                return;
+            }
+
             TaskValidationResult validationResult = taskService.ValidateTask(
-                titleInput.text,
-                subjectInput.text,
-                dueDateInput.text);
+                editTitleInput.text,
+                editSubjectInput.text,
+                editDueDateInput.text);
 
             if (validationResult != TaskValidationResult.Valid)
             {
@@ -161,10 +421,10 @@ namespace Pomo.Presentation.Screens
 
             TaskModel updatedTask = taskService.UpdateTask(
                 editingTaskId,
-                titleInput.text,
-                descriptionInput.text,
-                subjectInput.text,
-                dueDateInput.text);
+                editTitleInput.text,
+                editDescriptionInput.text,
+                editSubjectInput.text,
+                editDueDateInput.text);
 
             if (updatedTask == null)
             {
@@ -172,9 +432,14 @@ namespace Pomo.Presentation.Screens
                 return;
             }
 
-            ClearTaskForm();
+            ClearEditForm();
             ShowFeedback("Tarea actualizada correctamente.");
-            taskListController?.ShowList();
+            ShowTaskList();
+
+            if (savedChangesPanel != null)
+            {
+                savedChangesPanel.SetActive(true);
+            }
         }
 
         private void ClearTaskForm()
@@ -183,15 +448,25 @@ namespace Pomo.Presentation.Screens
             descriptionInput.text = string.Empty;
             subjectInput.text = string.Empty;
             dueDateInput.text = string.Empty;
+            SetEditMode(false);
+        }
+
+        private void ClearEditForm()
+        {
+            if (editTitleInput != null) editTitleInput.text = string.Empty;
+            if (editDescriptionInput != null) editDescriptionInput.text = string.Empty;
+            if (editSubjectInput != null) editSubjectInput.text = string.Empty;
+            if (editDueDateInput != null) editDueDateInput.text = string.Empty;
+
             editingTaskId = null;
             SetEditMode(false);
         }
 
         private void SetEditMode(bool isEditing)
         {
-            if (createButtonLabel != null)
+            if (submitTaskButtonLabel != null)
             {
-                createButtonLabel.text = isEditing ? "Guardar cambios" : "Crear tarea";
+                submitTaskButtonLabel.text = isEditing ? "Guardar cambios" : "Crear tarea";
             }
 
             if (cancelEditButton != null)
@@ -242,66 +517,105 @@ namespace Pomo.Presentation.Screens
             }
         }
 
-        private void CacheCreateButton()
-        {
-            GameObject buttonObject = GameObject.Find("CreateTaskButton");
-
-            if (buttonObject == null)
-            {
-                return;
-            }
-
-            createButtonLabel = buttonObject.GetComponentInChildren<TMP_Text>(true);
-            CreateCancelEditButton(buttonObject.transform.parent, buttonObject.GetComponent<RectTransform>());
-            SetEditMode(false);
-        }
-
-        private void CreateCancelEditButton(Transform parent, RectTransform sourceRect)
-        {
-            GameObject buttonObject = CreatePanel(
-                "CancelTaskEditButton",
-                parent,
-                new Color32(92, 103, 116, 255));
-
-            RectTransform buttonRect = buttonObject.GetComponent<RectTransform>();
-            buttonRect.anchorMin = sourceRect.anchorMin;
-            buttonRect.anchorMax = sourceRect.anchorMax;
-            buttonRect.pivot = sourceRect.pivot;
-            buttonRect.anchoredPosition = sourceRect.anchoredPosition + new Vector2(0f, -95f);
-            buttonRect.sizeDelta = new Vector2(sourceRect.sizeDelta.x, 80f);
-
-            cancelEditButton = buttonObject.AddComponent<Button>();
-            cancelEditButton.targetGraphic = buttonObject.GetComponent<Image>();
-            cancelEditButton.onClick.AddListener(CancelEditing);
-
-            TMP_Text label = CreateText(
-                "Cancelar edición",
-                buttonObject.transform,
-                25,
-                Color.white,
-                TextAlignmentOptions.Center);
-            SetAnchors(label.rectTransform, Vector2.zero, Vector2.one);
-        }
-
         private void SetupTaskList()
         {
-            GameObject taskCanvas = GameObject.Find("TaskCreationCanvas");
-
-            if (taskCanvas == null)
+            if (taskListContent == null || taskItemPrefab == null)
             {
-                ShowFeedback("No se encontró el espacio para mostrar las tareas.");
+                ShowFeedback("Asigna el Content y el prefab de tarea en TasksScreenController.");
                 return;
             }
 
-            taskListController = taskCanvas.GetComponent<TaskListController>();
+            taskListController = GetComponent<TaskListController>();
 
             if (taskListController == null)
             {
-                taskListController = taskCanvas.AddComponent<TaskListController>();
+                taskListController = gameObject.AddComponent<TaskListController>();
             }
 
-            ConfirmationPopup popup = FindFirstObjectByType<ConfirmationPopup>(FindObjectsInactive.Include);
-            taskListController.Initialize(taskService, popup, this);
+            taskListController.Initialize(taskService, this, taskListContent, taskItemPrefab);
+        }
+
+        private bool HasEditInputs()
+        {
+            return editTitleInput != null &&
+                   editDescriptionInput != null &&
+                   editSubjectInput != null &&
+                   editDueDateInput != null;
+        }
+
+        private void ShowEditTaskPanel()
+        {
+            SetTaskPanels(false, false, false);
+
+            if (editTaskPanel != null)
+            {
+                editTaskPanel.SetActive(true);
+            }
+        }
+
+        private void SetTaskPanels(bool showList, bool showCreateForm, bool showDetail)
+        {
+            if (taskListPanel != null) taskListPanel.SetActive(showList);
+            if (taskFormPanel != null) taskFormPanel.SetActive(showCreateForm);
+            if (taskDetailPanel != null) taskDetailPanel.SetActive(showDetail);
+            if (editTaskPanel != null) editTaskPanel.SetActive(false);
+        }
+
+        private string GetStatusLabelForDetail(TaskModel task)
+        {
+            switch (task.status)
+            {
+                case TaskStatus.InProgress:
+                    return "En progreso";
+                case TaskStatus.Completed:
+                    return "Completada";
+                default:
+                    return taskService.IsOverdue(task, DateTimeOffset.Now)
+                        ? "Vencida"
+                        : taskService.IsDueSoon(task, DateTimeOffset.Now)
+                            ? "Próxima a vencer"
+                            : "Por iniciar";
+            }
+        }
+
+        private static void SetDetailValue(
+            TMP_InputField inputTarget,
+            TMP_Text textTarget,
+            string value)
+        {
+            if (inputTarget != null)
+            {
+                inputTarget.readOnly = true;
+                inputTarget.text = value;
+                return;
+            }
+
+            if (textTarget == null)
+            {
+                return;
+            }
+
+            TMP_InputField parentInput = textTarget.GetComponentInParent<TMP_InputField>();
+
+            if (parentInput != null)
+            {
+                parentInput.readOnly = true;
+                parentInput.text = value;
+                parentInput.textComponent.text = value;
+                return;
+            }
+
+            textTarget.text = value;
+        }
+
+        private void CloseDeleteConfirmation()
+        {
+            pendingDeleteAction = null;
+
+            if (deleteConfirmationPanel != null)
+            {
+                deleteConfirmationPanel.SetActive(false);
+            }
         }
 
         private void SetupWorkBlocks()
