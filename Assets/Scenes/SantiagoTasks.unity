@@ -40299,8 +40299,8 @@ MonoBehaviour:
   secondsText: {fileID: 1625819828}
   stateText: {fileID: 408022194}
   progressSlider: {fileID: 0}
-  backgroundPanel: {fileID: 1836087131}
-  workColor: {r: 0.03921569, g: 0.19607843, b: 0.4, a: 1}
+  backgroundPanel: {fileID: 1447384629}
+  workColor: {r: 0.3137255, g: 0.47058824, b: 0.6862745, a: 1}
   restColor: {r: 0.55, g: 0.8, b: 0.62, a: 1}
 --- !u!1 &2090887028
 GameObject:

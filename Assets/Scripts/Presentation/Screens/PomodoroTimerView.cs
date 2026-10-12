@@ -18,8 +18,22 @@ namespace Pomo.Presentation.Screens
         [SerializeField] private TMP_Text stateText;
         [SerializeField] private Slider progressSlider;
         [SerializeField] private Image backgroundPanel;
-        [SerializeField] private Color workColor = new Color(0.03921569f, 0.19607843f, 0.4f, 1f);
+        [SerializeField] private Color workColor = new Color(0.3137255f, 0.47058824f, 0.6862745f, 1f);
         [SerializeField] private Color restColor = new Color(0.55f, 0.8f, 0.62f, 1f);
+
+        private Image timerPanel;
+
+        private void Awake()
+        {
+            // La vista está sobre el recuadro azul que contiene los dígitos.
+            // Se prioriza esa imagen para no modificar el panel de fondo.
+            timerPanel = GetComponent<Image>();
+
+            if (timerPanel == null)
+            {
+                timerPanel = backgroundPanel;
+            }
+        }
 
         private void Update()
         {
@@ -38,9 +52,9 @@ namespace Pomo.Presentation.Screens
             if (secondsText != null) secondsText.text = seconds.ToString("00");
             if (stateText != null) stateText.text = GetStateLabel();
             if (progressSlider != null) progressSlider.value = pomodoroController.Progress;
-            if (backgroundPanel != null)
+            if (timerPanel != null)
             {
-                backgroundPanel.color = pomodoroController.IsRestPhase ? restColor : workColor;
+                timerPanel.color = pomodoroController.IsRestPhase ? restColor : workColor;
             }
         }
 
@@ -48,7 +62,7 @@ namespace Pomo.Presentation.Screens
         {
             if (pomodoroController.IsRestPhase)
             {
-                return "Descanso";
+                return "TÓMATE UN DESCANSO";
             }
 
             switch (pomodoroController.State)

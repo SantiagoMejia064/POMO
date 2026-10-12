@@ -186,7 +186,8 @@ namespace Pomo.Business.Pomodoro
 
             return new List<WorkBlockModel>
             {
-                CreatePreset(ShortBlockId, "Corta", 25, 5, favoritePresetIds.Contains(ShortBlockId)),
+                // Configuración temporal de prueba: un minuto de foco y cinco de descanso.
+                CreatePreset(ShortBlockId, "Corta", 1, 5, favoritePresetIds.Contains(ShortBlockId)),
                 CreatePreset(MediumBlockId, "Media", 50, 10, favoritePresetIds.Contains(MediumBlockId)),
                 CreatePreset(LongBlockId, "Larga", 90, 15, favoritePresetIds.Contains(LongBlockId))
             };
