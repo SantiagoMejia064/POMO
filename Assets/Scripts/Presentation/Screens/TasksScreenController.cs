@@ -22,6 +22,9 @@ namespace Pomo.Presentation.Screens
         [Header("Feedback")]
         public TMP_Text feedbackText;
 
+        [Header("Notificaciones")]
+        [SerializeField] private PomoNotifications notificationUI;
+
         [Header("Paneles de tareas")]
         public GameObject taskListPanel;
         public GameObject taskFormPanel;
@@ -82,6 +85,13 @@ namespace Pomo.Presentation.Screens
 
         private void Start()
         {
+            // Permite asignar el gestor desde el Inspector. Si no se asigna,
+            // se busca el panel que ya exista en la escena.
+            if (notificationUI == null)
+            {
+                notificationUI = FindObjectOfType<PomoNotifications>();
+            }
+
             SetupTaskList();
 
             if (initializeWorkBlocks)
@@ -145,6 +155,8 @@ namespace Pomo.Presentation.Screens
             ClearTaskForm();
             ShowFeedback("Tarea creada correctamente.");
             ShowTaskList();
+
+            ShowDueSoonNotification(task);
         }
 
         public void BeginEdit(string taskId)
@@ -514,6 +526,20 @@ namespace Pomo.Presentation.Screens
                 case TaskValidationResult.InvalidDateFormat:
                     ShowFeedback("La fecha debe tener formato DD/MM/AAAA.");
                     break;
+            }
+        }
+
+        private void ShowDueSoonNotification(TaskModel task)
+        {
+            if (notificationUI == null || task == null)
+            {
+                return;
+            }
+
+            // daysAhead = 1 incluye las tareas con vencimiento hoy y mañana.
+            if (taskService.IsDueSoon(task, DateTimeOffset.Now, 1))
+            {
+                notificationUI.MostrarRecordatorio();
             }
         }
 
