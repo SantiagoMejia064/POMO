@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Pomo.Business.Pomodoro;
+using Pomo.Business.Progress;
 using Pomo.Business.Tasks;
 using Pomo.Data.Models;
 using Pomo.ServicesAdapters.Audio;
@@ -19,6 +20,7 @@ namespace Pomo.Presentation.Screens
         private PomodoroTimer timer;
         private BlockSessionService sessionService;
         private AudioService audioService;
+        private ProgressService progressService;
 
         public float RemainingSeconds => timer?.RemainingSeconds ?? 0f;
         public int CurrentPhaseDurationSeconds => timer?.CurrentPhaseDurationSeconds ?? 0;
@@ -43,6 +45,7 @@ namespace Pomo.Presentation.Screens
             timer = new PomodoroTimer();
             audioService = new AudioService();
             sessionService = new BlockSessionService(new TaskService(), new PomodoroService());
+            progressService = new ProgressService();
 
             timer.StateChanged += state => StateChanged?.Invoke(state);
             timer.WorkCompleted += OnWorkCompleted;
@@ -159,6 +162,12 @@ namespace Pomo.Presentation.Screens
 
         private void OnWorkCompleted()
         {
+            TaskModel selectedTask = sessionService.SelectedTask;
+            progressService.RecordCompletedFocusBlock(
+                timer.FocusDurationSeconds,
+                DateTime.Today,
+                selectedTask?.id,
+                selectedTask?.title);
             audioService.RequestCycleCompletedPlayback();
             WorkCompleted?.Invoke();
         }
