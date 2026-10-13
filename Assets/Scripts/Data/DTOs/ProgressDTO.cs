@@ -9,5 +9,6 @@ namespace Pomo.Data.DTOs
     {
         public List<DailyProgressModel> dailyProgress = new List<DailyProgressModel>();
         public List<TrophyAwardModel> trophyAwards = new List<TrophyAwardModel>();
+        public int cupsBalance;
     }
 }

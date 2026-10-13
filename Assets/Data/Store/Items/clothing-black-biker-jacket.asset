@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: Chaqueta biker negra con detalles plateados
   description: 
   category: 0
-  priceInCups: 0
-  priceConfigured: 0
+  priceInCups: 700
+  priceConfigured: 1
   availableInStore: 1
   previewImage: {fileID: 21300000, guid: 8227449c22499814db03a58d71e8bd88, type: 3}

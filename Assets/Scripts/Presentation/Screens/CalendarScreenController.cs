@@ -35,6 +35,7 @@ namespace Pomo.Presentation.Screens
 
         [Header("Integración")]
         [SerializeField] private TasksScreenController tasksScreenController;
+        [SerializeField] private GameObject tasksSection;
 
         private static readonly string[] WeekdayNames = { "L", "M", "M", "J", "V", "S", "D" };
         private static readonly Color HeaderColor = Hex("#123B68");
@@ -600,10 +601,9 @@ namespace Pomo.Presentation.Screens
 
         private void ActivateTasksSection()
         {
-            GameObject taskSection = GameObject.Find("Sección tareas");
-            if (taskSection != null && !taskSection.activeSelf)
+            if (tasksSection != null && !tasksSection.activeSelf)
             {
-                taskSection.SetActive(true);
+                tasksSection.SetActive(true);
             }
         }
 

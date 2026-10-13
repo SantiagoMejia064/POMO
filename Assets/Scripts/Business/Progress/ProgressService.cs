@@ -19,6 +19,8 @@ namespace Pomo.Business.Progress
         public const int MinimumTaskTrophyReward = 50;
         public const int MaximumTaskTrophyReward = 300;
 
+        public static event Action<int> CupsBalanceChanged;
+
         public ProgressService()
             : this(new ProgressRepository(), new TaskService())
         {
@@ -117,12 +119,13 @@ namespace Pomo.Business.Progress
                 awardedAt = DateTimeOffset.Now.ToString("O")
             };
 
-            if (!progressRepository.TryRecordTrophyAward(candidate))
+            if (!progressRepository.TryRecordTrophyAwardAndAddCups(candidate))
             {
                 return false;
             }
 
             award = candidate;
+            CupsBalanceChanged?.Invoke(GetCupsBalance());
             return true;
         }
 
@@ -134,6 +137,33 @@ namespace Pomo.Business.Progress
         public int GetTotalTrophies()
         {
             return progressRepository.GetTotalTrophies();
+        }
+
+        public int GetCupsBalance()
+        {
+            return progressRepository.GetCupsBalance();
+        }
+
+        public bool AddCups(int amount)
+        {
+            if (!progressRepository.AddCups(amount))
+            {
+                return false;
+            }
+
+            CupsBalanceChanged?.Invoke(GetCupsBalance());
+            return true;
+        }
+
+        public bool TrySpendCups(int amount)
+        {
+            if (!progressRepository.TrySpendCups(amount))
+            {
+                return false;
+            }
+
+            CupsBalanceChanged?.Invoke(GetCupsBalance());
+            return true;
         }
 
         public IReadOnlyList<CompletedFocusBlockModel> GetCompletedStudySessions()

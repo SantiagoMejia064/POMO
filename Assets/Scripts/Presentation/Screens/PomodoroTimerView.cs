@@ -15,7 +15,7 @@ namespace Pomo.Presentation.Screens
         [SerializeField] private TMP_Text hoursText;
         [SerializeField] private TMP_Text minutesText;
         [SerializeField] private TMP_Text secondsText;
-        [SerializeField] private TMP_Text stateText;
+        [SerializeField] private TMP_Text encouragementText;
         [SerializeField] private Slider progressSlider;
         [SerializeField] private Image backgroundPanel;
         [SerializeField] private Color workColor = new Color(0.3137255f, 0.47058824f, 0.6862745f, 1f);
@@ -50,7 +50,7 @@ namespace Pomo.Presentation.Screens
             if (hoursText != null) hoursText.text = hours.ToString("00");
             if (minutesText != null) minutesText.text = minutes.ToString("00");
             if (secondsText != null) secondsText.text = seconds.ToString("00");
-            if (stateText != null) stateText.text = GetStateLabel();
+            if (encouragementText != null) encouragementText.text = GetStateLabel();
             if (progressSlider != null) progressSlider.value = pomodoroController.Progress;
             if (timerPanel != null)
             {

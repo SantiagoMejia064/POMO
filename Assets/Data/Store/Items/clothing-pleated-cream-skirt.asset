@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: Falda plisada crema con volantes
   description: 
   category: 0
-  priceInCups: 0
-  priceConfigured: 0
+  priceInCups: 500
+  priceConfigured: 1
   availableInStore: 1
   previewImage: {fileID: 21300000, guid: 626a795555fd35f43a5ecc5f9a5bcb6a, type: 3}

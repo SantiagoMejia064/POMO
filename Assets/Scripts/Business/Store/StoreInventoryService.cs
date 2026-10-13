@@ -45,5 +45,10 @@ namespace Pomo.Business.Store
                 ? StoreInventoryUpdateResult.Success
                 : StoreInventoryUpdateResult.AlreadyOwned;
         }
+
+        public bool RemoveAcquiredItem(string itemId)
+        {
+            return inventoryRepository.RemoveOwnedItem(itemId);
+        }
     }
 }

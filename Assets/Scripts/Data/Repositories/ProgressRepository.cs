@@ -85,6 +85,43 @@ namespace Pomo.Data.Repositories
             return total;
         }
 
+        public int GetCupsBalance()
+        {
+            Reload();
+            return storedProgress.cupsBalance;
+        }
+
+        public bool AddCups(int amount)
+        {
+            if (amount <= 0)
+            {
+                return false;
+            }
+
+            Reload();
+            storedProgress.cupsBalance += amount;
+            Save();
+            return true;
+        }
+
+        public bool TrySpendCups(int amount)
+        {
+            if (amount < 0)
+            {
+                return false;
+            }
+
+            Reload();
+            if (storedProgress.cupsBalance < amount)
+            {
+                return false;
+            }
+
+            storedProgress.cupsBalance -= amount;
+            Save();
+            return true;
+        }
+
         public bool TryRecordTrophyAward(TrophyAwardModel award)
         {
             Reload();
@@ -95,6 +132,21 @@ namespace Pomo.Data.Repositories
             }
 
             storedProgress.trophyAwards.Add(award);
+            Save();
+            return true;
+        }
+
+        public bool TryRecordTrophyAwardAndAddCups(TrophyAwardModel award)
+        {
+            Reload();
+            if (award == null || string.IsNullOrWhiteSpace(award.taskId) || award.trophyAmount <= 0 ||
+                storedProgress.trophyAwards.Exists(existing => existing != null && existing.taskId == award.taskId))
+            {
+                return false;
+            }
+
+            storedProgress.trophyAwards.Add(award);
+            storedProgress.cupsBalance += award.trophyAmount;
             Save();
             return true;
         }
@@ -113,6 +165,7 @@ namespace Pomo.Data.Repositories
 
             storedProgress.dailyProgress ??= new List<DailyProgressModel>();
             storedProgress.trophyAwards ??= new List<TrophyAwardModel>();
+            storedProgress.cupsBalance = Math.Max(0, storedProgress.cupsBalance);
 
             foreach (DailyProgressModel progress in storedProgress.dailyProgress)
             {

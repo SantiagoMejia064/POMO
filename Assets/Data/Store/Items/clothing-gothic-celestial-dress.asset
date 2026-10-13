@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: "Vestido g\xF3tico celestial negro y dorado"
   description: 
   category: 0
-  priceInCups: 0
-  priceConfigured: 0
+  priceInCups: 700
+  priceConfigured: 1
   availableInStore: 1
   previewImage: {fileID: 21300000, guid: ca6629e7551526941b9a1df0933a3948, type: 3}

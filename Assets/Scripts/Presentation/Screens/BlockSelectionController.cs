@@ -45,6 +45,7 @@ namespace Pomo.Presentation.Screens
         [SerializeField] private InputField legacyBlockNameInput;
         [SerializeField] private TMP_Text selectionRequiredText;
         [SerializeField] private Button addToFavoritesButton;
+        [SerializeField] private Text addToFavoritesButtonText;
 
         public bool CanContinue => pomodoroController != null && pomodoroController.HasTaskAndBlock;
         public event Action SelectionChanged;
@@ -69,6 +70,7 @@ namespace Pomo.Presentation.Screens
         {
             RefreshConfigurationLists();
             RefreshFavoriteBlocks();
+            RefreshAddToFavoritesButtonLabel();
         }
 
         public void RefreshConfigurationLists()
@@ -154,6 +156,20 @@ namespace Pomo.Presentation.Screens
         {
             pomodoroController?.StartBlock();
             SetAddToFavoritesButtonVisible(false);
+        }
+
+        public void ToggleSelectedBlockFavorite()
+        {
+            WorkBlockModel selectedBlock = pomodoroController?.SelectedBlock;
+            if (selectedBlock == null || !pomodoroController.ToggleFavorite(selectedBlock.id))
+            {
+                return;
+            }
+
+            RefreshConfigurationLists();
+            RefreshFavoriteBlocks();
+            RefreshAddToFavoritesButtonLabel();
+            SelectionChanged?.Invoke();
         }
 
         public void SaveCustomBlock()
@@ -333,6 +349,7 @@ namespace Pomo.Presentation.Screens
             if (favoriteBlocksPanel != null) favoriteBlocksPanel.SetActive(false);
             if (timerPanel != null) timerPanel.SetActive(true);
             SetAddToFavoritesButtonVisible(true);
+            RefreshAddToFavoritesButtonLabel();
             BlockPrepared?.Invoke();
         }
 
@@ -407,10 +424,20 @@ namespace Pomo.Presentation.Screens
                     if (button.gameObject.name == "Botón agregar a favoritos")
                     {
                         addToFavoritesButton = button;
-                        addToFavoritesButton.onClick.AddListener(OpenSaveBlockPanel);
                         break;
                     }
                 }
+            }
+
+            if (addToFavoritesButtonText == null && addToFavoritesButton != null)
+            {
+                addToFavoritesButtonText = addToFavoritesButton.GetComponentInChildren<Text>(true);
+            }
+
+            if (addToFavoritesButton != null)
+            {
+                addToFavoritesButton.onClick = new Button.ButtonClickedEvent();
+                addToFavoritesButton.onClick.AddListener(ToggleSelectedBlockFavorite);
             }
 
             foreach (Button button in GetComponentsInChildren<Button>(true))
@@ -423,10 +450,6 @@ namespace Pomo.Presentation.Screens
                 {
                     button.onClick.AddListener(RefreshFavoriteBlocks);
                 }
-                else if (button.gameObject.name == "Botón empezar")
-                {
-                    button.onClick.AddListener(StartSelectedBlock);
-                }
             }
         }
 
@@ -436,6 +459,19 @@ namespace Pomo.Presentation.Screens
             {
                 addToFavoritesButton.gameObject.SetActive(isVisible);
             }
+        }
+
+        private void RefreshAddToFavoritesButtonLabel()
+        {
+            if (addToFavoritesButtonText == null)
+            {
+                return;
+            }
+
+            WorkBlockModel selectedBlock = pomodoroController?.SelectedBlock;
+            addToFavoritesButtonText.text = selectedBlock != null && selectedBlock.isFavorite
+                ? "Quitar de favoritos"
+                : "Agregar a favoritos";
         }
 
         private void AutoWireFavoriteScrollView()

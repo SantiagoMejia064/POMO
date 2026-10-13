@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: Gafas blancas de sol
   description: 
   category: 1
-  priceInCups: 0
-  priceConfigured: 0
+  priceInCups: 300
+  priceConfigured: 1
   availableInStore: 1
   previewImage: {fileID: 21300000, guid: 6a89af200bcd8134eb9bde46cacd5fba, type: 3}

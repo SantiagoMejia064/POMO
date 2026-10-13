@@ -1,5 +1,6 @@
 using System;
 using Pomo.Business.Pomodoro;
+using Pomo.Business.Progress;
 using Pomo.Business.Tasks;
 using Pomo.Data.Models;
 using Pomo.Shared.Enums;
@@ -72,6 +73,7 @@ namespace Pomo.Presentation.Screens
         public bool initializeWorkBlocks;
 
         private TaskService taskService;
+        private ProgressService progressService;
         private TaskListController taskListController;
         private WorkBlocksScreenController workBlocksScreenController;
         private string editingTaskId;
@@ -81,6 +83,7 @@ namespace Pomo.Presentation.Screens
         private void Awake()
         {
             taskService = new TaskService();
+            progressService = new ProgressService();
         }
 
         private void Start()
@@ -400,6 +403,7 @@ namespace Pomo.Presentation.Screens
             switch (result)
             {
                 case TaskStatusTransitionResult.Success:
+                    TryAwardCompletedTask(taskId);
                     ShowFeedback("¡Muy bien! La tarea se completó automáticamente.");
                     break;
                 case TaskStatusTransitionResult.StatusUnchanged:
@@ -511,6 +515,10 @@ namespace Pomo.Presentation.Screens
             switch (result)
             {
                 case TaskStatusTransitionResult.Success:
+                    if (targetStatus == TaskStatus.Completed)
+                    {
+                        TryAwardCompletedTask(taskId);
+                    }
                     ShowFeedback(successMessage);
                     break;
                 case TaskStatusTransitionResult.StatusUnchanged:
@@ -525,6 +533,12 @@ namespace Pomo.Presentation.Screens
             }
 
             taskListController?.RefreshTaskList();
+        }
+
+        public bool TryAwardCompletedTask(string taskId)
+        {
+            TaskModel task = taskService.GetTask(taskId);
+            return task != null && progressService.TryRecordTaskTrophyAward(task, out _);
         }
 
         private void ShowValidationMessage(TaskValidationResult result)

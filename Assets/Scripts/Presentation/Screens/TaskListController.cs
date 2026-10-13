@@ -79,6 +79,10 @@ namespace Pomo.Presentation.Screens
 
             if (result == TaskStatusTransitionResult.Success)
             {
+                if (targetStatus == TaskStatus.Completed)
+                {
+                    screenController.TryAwardCompletedTask(taskId);
+                }
                 screenController.ShowFeedback(targetStatus == TaskStatus.InProgress
                     ? "Tarea iniciada."
                     : "Tarea completada.");
