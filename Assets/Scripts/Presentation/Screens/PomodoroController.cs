@@ -31,6 +31,11 @@ namespace Pomo.Presentation.Screens
         [SerializeField] private AudioSource cycleCompletionAudioSource;
         [SerializeField] private AudioClip cycleCompletionClip;
 
+        [Header("Prueba temporal")]
+        [SerializeField] private bool useShortTestCycle;
+        [SerializeField, Min(1)] private int testFocusSeconds = 25;
+        [SerializeField, Min(0)] private int testRestSeconds = 5;
+
         public float RemainingSeconds => timer?.RemainingSeconds ?? 0f;
         public int CurrentPhaseDurationSeconds => timer?.CurrentPhaseDurationSeconds ?? 0;
         public float Progress => timer?.Progress ?? 0f;
@@ -39,6 +44,7 @@ namespace Pomo.Presentation.Screens
         public bool IsSoundEnabled => audioService != null && audioService.IsEnabled;
         public bool IsBlockReady => sessionService != null && sessionService.IsReady;
         public bool HasTaskAndBlock => sessionService != null && sessionService.HasTaskAndBlock;
+        public int LastFocusBlockCupsAwarded { get; private set; }
         public bool CanChangeSessionSelection => timer == null ||
             (timer.State != PomodoroTimerState.Running &&
              timer.State != PomodoroTimerState.Paused &&
@@ -49,6 +55,7 @@ namespace Pomo.Presentation.Screens
         public event Action<PomodoroTimerState> StateChanged;
         public event Action WorkCompleted;
         public event Action RestCompleted;
+        public event Action<int> FocusBlockCupsAwarded;
         public event Action SoundRequested;
         public event Action NewMissionRequested;
         public event Action BlockPrepared;
@@ -127,8 +134,14 @@ namespace Pomo.Presentation.Screens
 
             bool prepared = sessionService.ConfigureTimer(timer);
 
+            if (prepared && useShortTestCycle)
+            {
+                prepared = timer.ConfigureSeconds(testFocusSeconds, testRestSeconds);
+            }
+
             if (prepared)
             {
+                LastFocusBlockCupsAwarded = 0;
                 BlockPrepared?.Invoke();
             }
 
@@ -204,7 +217,7 @@ namespace Pomo.Presentation.Screens
                 DateUtils.TryParseStoredDate(currentTask.completedAt, out DateTimeOffset taskCompletedAt) &&
                 taskCompletedAt >= startedAt && taskCompletedAt <= completedAt;
 
-            progressService.RecordCompletedFocusBlock(
+            DailyProgressModel recordedProgress = progressService.RecordCompletedFocusBlock(
                 timer.FocusDurationSeconds,
                 completedAt.LocalDateTime.Date,
                 selectedTask?.id,
@@ -213,6 +226,14 @@ namespace Pomo.Presentation.Screens
                 startedAt,
                 completedAt,
                 taskCompletedDuringBlock);
+
+            if (recordedProgress != null &&
+                progressService.AddCups(ProgressService.CompletedFocusBlockCupsReward))
+            {
+                LastFocusBlockCupsAwarded = ProgressService.CompletedFocusBlockCupsReward;
+                FocusBlockCupsAwarded?.Invoke(ProgressService.CompletedFocusBlockCupsReward);
+            }
+
             activeFocusStartedAt = default;
             audioService.RequestCycleCompletedPlayback();
             notificationService.NotifyBreakStarted(selectedTask?.title);

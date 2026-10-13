@@ -19,6 +19,7 @@ namespace Pomo.Business.Progress
 
         public const int MinimumTaskTrophyReward = 50;
         public const int MaximumTaskTrophyReward = 300;
+        public const int CompletedFocusBlockCupsReward = 20;
 
         public static event Action<int> CupsBalanceChanged;
 

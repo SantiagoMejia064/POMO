@@ -34,10 +34,18 @@ namespace Pomo.Business.Pomodoro
                 return false;
             }
 
-            // El bloque seleccionado define la duración del temporizador.
-            // Por ejemplo: 25 min = 1.500 s, 50 min = 3.000 s y 90 min = 5.400 s.
-            FocusDurationSeconds = focusMinutes * 60;
-            RestDurationSeconds = restMinutes * 60;
+            return ConfigureSeconds(focusMinutes * 60, restMinutes * 60);
+        }
+
+        public bool ConfigureSeconds(int focusSeconds, int restSeconds)
+        {
+            if (focusSeconds < 1 || restSeconds < 0)
+            {
+                return false;
+            }
+
+            FocusDurationSeconds = focusSeconds;
+            RestDurationSeconds = restSeconds;
             CurrentPhaseDurationSeconds = FocusDurationSeconds;
             RemainingSeconds = FocusDurationSeconds;
             isRestPhase = false;

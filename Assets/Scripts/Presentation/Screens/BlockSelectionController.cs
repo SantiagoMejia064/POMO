@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using Pomo.Business.Pomodoro;
 using Pomo.Data.Models;
 using TMPro;
 using UnityEngine;
@@ -36,6 +38,10 @@ namespace Pomo.Presentation.Screens
         [SerializeField] private GameObject timerPanel;
         [SerializeField] private GameObject saveBlockPanel;
 
+        [Header("Finalización de ciclo")]
+        [SerializeField] private GameObject homePanel;
+        [SerializeField, Min(1f)] private float completionMessageSeconds = 7f;
+
         [Header("Misión nueva")]
         [SerializeField] private Button createTaskFromBlockButton;
         [SerializeField] private TasksScreenController tasksScreenController;
@@ -54,6 +60,7 @@ namespace Pomo.Presentation.Screens
         private readonly List<BlockTaskSelectionItemView> taskItems = new List<BlockTaskSelectionItemView>();
         private readonly List<WorkBlockItemView> durationItems = new List<WorkBlockItemView>();
         private string defaultSelectionRequiredText;
+        private Coroutine returnHomeRoutine;
 
         private void Awake()
         {
@@ -71,6 +78,19 @@ namespace Pomo.Presentation.Screens
             RefreshConfigurationLists();
             RefreshFavoriteBlocks();
             RefreshAddToFavoritesButtonLabel();
+
+            if (pomodoroController != null)
+            {
+                pomodoroController.RestCompleted += ReturnHomeAfterCompletion;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (pomodoroController != null)
+            {
+                pomodoroController.RestCompleted -= ReturnHomeAfterCompletion;
+            }
         }
 
         public void RefreshConfigurationLists()
@@ -269,6 +289,14 @@ namespace Pomo.Presentation.Screens
 
             foreach (WorkBlockModel block in pomodoroController.GetAvailableBlocks())
             {
+                if (block == null ||
+                    (block.id != PomodoroService.ShortBlockId &&
+                     block.id != PomodoroService.MediumBlockId &&
+                     block.id != PomodoroService.LongBlockId))
+                {
+                    continue;
+                }
+
                 WorkBlockItemView item = Instantiate(durationItemPrefab, durationContent);
                 item.Bind(
                     block.name,
@@ -351,6 +379,30 @@ namespace Pomo.Presentation.Screens
             SetAddToFavoritesButtonVisible(true);
             RefreshAddToFavoritesButtonLabel();
             BlockPrepared?.Invoke();
+        }
+
+        private void ReturnHomeAfterCompletion()
+        {
+            if (returnHomeRoutine != null)
+            {
+                StopCoroutine(returnHomeRoutine);
+            }
+
+            returnHomeRoutine = StartCoroutine(ReturnHomeAfterCompletionRoutine());
+        }
+
+        private IEnumerator ReturnHomeAfterCompletionRoutine()
+        {
+            yield return new WaitForSeconds(completionMessageSeconds);
+
+            if (timerPanel != null) timerPanel.SetActive(false);
+            if (personalizeBlockPanel != null) personalizeBlockPanel.SetActive(false);
+            if (favoriteBlocksPanel != null) favoriteBlocksPanel.SetActive(false);
+            if (saveBlockPanel != null) saveBlockPanel.SetActive(false);
+            if (homePanel != null) homePanel.SetActive(true);
+
+            pomodoroController?.ResetTimer();
+            returnHomeRoutine = null;
         }
 
         private static void ClearContent(Transform content)

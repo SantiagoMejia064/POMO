@@ -72,10 +72,13 @@ namespace Pomo.Presentation.Screens
                 case Pomo.Shared.Enums.PomodoroTimerState.Paused:
                     return "Pausado";
                 case Pomo.Shared.Enums.PomodoroTimerState.Completed:
-                    return "¡Ideas terminado!";
+                    return pomodoroController.LastFocusBlockCupsAwarded > 0
+                        ? $"¡Ganaste {pomodoroController.LastFocusBlockCupsAwarded} copas!"
+                        : "¡Bloque terminado!";
                 default:
                     return "Listo";
             }
         }
+
     }
 }
