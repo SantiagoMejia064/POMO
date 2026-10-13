@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using Pomo.Data.Models;
 using Pomo.Data.Repositories;
 using Pomo.Business.Tasks;
@@ -225,6 +226,221 @@ namespace Pomo.Business.Progress
         public DailyProgressModel GetProgressForDate(DateTime date)
         {
             return progressRepository.GetByDate(date.ToString("yyyy-MM-dd"));
+        }
+
+        /// <summary>
+        /// Returns the progress calculated from sessions completed in the Monday-to-Sunday
+        /// week that contains <paramref name="referenceDate"/>.
+        /// </summary>
+        public WeeklyProgressModel GetProgressForWeek(DateTime referenceDate)
+        {
+            DateTime weekStart = GetWeekStart(referenceDate);
+            DateTime weekEnd = weekStart.AddDays(6);
+            WeeklyProgressModel progress = new WeeklyProgressModel
+            {
+                weekStart = weekStart,
+                weekEnd = weekEnd
+            };
+
+            foreach (CompletedFocusBlockModel session in GetCompletedStudySessions())
+            {
+                if (session == null || !TryGetSessionDate(session, out DateTime sessionDate) ||
+                    sessionDate < weekStart || sessionDate > weekEnd)
+                {
+                    continue;
+                }
+
+                progress.sessions.Add(session);
+                progress.sessionCount++;
+                progress.workedSeconds += Math.Max(0, session.workedSeconds);
+
+                if (session.taskCompleted)
+                {
+                    progress.completedTasks++;
+                }
+            }
+
+            return progress;
+        }
+
+        public ProgressComparisonModel CompareProgress(
+            DailyProgressModel periodA,
+            DailyProgressModel periodB)
+        {
+            return CompareSessions(periodA?.completedBlocks, periodB?.completedBlocks);
+        }
+
+        public ProgressComparisonModel CompareProgress(
+            WeeklyProgressModel periodA,
+            WeeklyProgressModel periodB)
+        {
+            return CompareSessions(periodA?.sessions, periodB?.sessions);
+        }
+
+        /// <summary>
+        /// Compares two groups of completed focus sessions without changing persisted progress.
+        /// Differences are calculated as period B minus period A.
+        /// </summary>
+        public ProgressComparisonModel CompareSessions(
+            IReadOnlyList<CompletedFocusBlockModel> sessionsA,
+            IReadOnlyList<CompletedFocusBlockModel> sessionsB)
+        {
+            ProgressComparisonModel comparison = new ProgressComparisonModel();
+            PopulateComparisonMetrics(
+                sessionsA,
+                out comparison.workedSecondsA,
+                out comparison.completedTasksA,
+                out comparison.sessionCountA,
+                out comparison.averageSessionSecondsA);
+            PopulateComparisonMetrics(
+                sessionsB,
+                out comparison.workedSecondsB,
+                out comparison.completedTasksB,
+                out comparison.sessionCountB,
+                out comparison.averageSessionSecondsB);
+
+            comparison.workedSecondsDifference = comparison.workedSecondsB - comparison.workedSecondsA;
+            comparison.completedTasksDifference = comparison.completedTasksB - comparison.completedTasksA;
+            comparison.sessionCountDifference = comparison.sessionCountB - comparison.sessionCountA;
+            return comparison;
+        }
+
+        /// <summary>
+        /// Selects a concise, presentation-ready feedback message from comparison metrics.
+        /// </summary>
+        public ProgressFeedbackModel GetPerformanceFeedback(ProgressComparisonModel comparison)
+        {
+            ProgressComparisonModel metrics = comparison ?? new ProgressComparisonModel();
+            ProgressFeedbackModel feedback = new ProgressFeedbackModel
+            {
+                comparison = metrics
+            };
+
+            if (metrics.sessionCountA == 0 || metrics.sessionCountB == 0)
+            {
+                feedback.classification = PerformanceFeedbackClassification.Neutral;
+                feedback.message = "Aún no hay suficiente actividad para comparar. Completa otro bloque y revisa tu progreso.";
+                return feedback;
+            }
+
+            if (metrics.completedTasksDifference > 0)
+            {
+                feedback.classification = PerformanceFeedbackClassification.Improved;
+                feedback.message = "¡Vas mejorando! Completaste más tareas que antes.";
+                return feedback;
+            }
+
+            if (metrics.completedTasksDifference < 0)
+            {
+                feedback.classification = PerformanceFeedbackClassification.NeedsImprovement;
+                feedback.message = "Avanzaste con menos tareas. Organiza un nuevo bloque para retomar el ritmo.";
+                return feedback;
+            }
+
+            if ((metrics.workedSecondsDifference > 0 && metrics.sessionCountDifference < 0) ||
+                (metrics.workedSecondsDifference < 0 && metrics.sessionCountDifference > 0))
+            {
+                feedback.classification = PerformanceFeedbackClassification.Stable;
+                feedback.message = "Tu ritmo se mantuvo equilibrado. ¡Sigue así!";
+                return feedback;
+            }
+
+            if (metrics.workedSecondsDifference > 0 && metrics.sessionCountDifference >= 0)
+            {
+                feedback.classification = PerformanceFeedbackClassification.Improved;
+                feedback.message = "¡Buen avance! Dedicaste más tiempo a tus bloques de estudio.";
+                return feedback;
+            }
+
+            if (metrics.workedSecondsDifference < 0 && metrics.sessionCountDifference <= 0)
+            {
+                feedback.classification = PerformanceFeedbackClassification.NeedsImprovement;
+                feedback.message = "Hoy avanzaste un poco menos. Intenta organizar un nuevo bloque de trabajo.";
+                return feedback;
+            }
+
+            if (metrics.sessionCountDifference > 0 || metrics.averageSessionSecondsB > metrics.averageSessionSecondsA)
+            {
+                feedback.classification = PerformanceFeedbackClassification.Improved;
+                feedback.message = "¡Buen avance! Mantuviste más actividad en tus sesiones.";
+                return feedback;
+            }
+
+            if (metrics.sessionCountDifference < 0 || metrics.averageSessionSecondsB < metrics.averageSessionSecondsA)
+            {
+                feedback.classification = PerformanceFeedbackClassification.NeedsImprovement;
+                feedback.message = "Tu actividad fue menor. Un bloque corto puede ayudarte a retomar el ritmo.";
+                return feedback;
+            }
+
+            feedback.classification = PerformanceFeedbackClassification.Stable;
+            feedback.message = "Mantienes un ritmo constante. ¡Sigue así!";
+            return feedback;
+        }
+
+        private static void PopulateComparisonMetrics(
+            IReadOnlyList<CompletedFocusBlockModel> sessions,
+            out int workedSeconds,
+            out int completedTasks,
+            out int sessionCount,
+            out int averageSessionSeconds)
+        {
+            workedSeconds = 0;
+            completedTasks = 0;
+            sessionCount = 0;
+
+            if (sessions == null)
+            {
+                averageSessionSeconds = 0;
+                return;
+            }
+
+            foreach (CompletedFocusBlockModel session in sessions)
+            {
+                if (session == null)
+                {
+                    continue;
+                }
+
+                workedSeconds += Math.Max(0, session.workedSeconds);
+                sessionCount++;
+
+                if (session.taskCompleted)
+                {
+                    completedTasks++;
+                }
+            }
+
+            averageSessionSeconds = sessionCount == 0 ? 0 : workedSeconds / sessionCount;
+        }
+
+        private static DateTime GetWeekStart(DateTime referenceDate)
+        {
+            DateTime day = referenceDate.Date;
+            int daysSinceMonday = ((int)day.DayOfWeek + 6) % 7;
+            return day.AddDays(-daysSinceMonday);
+        }
+
+        private static bool TryGetSessionDate(CompletedFocusBlockModel session, out DateTime date)
+        {
+            if (DateTime.TryParseExact(
+                    session.sessionDate,
+                    "yyyy-MM-dd",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out date))
+            {
+                return true;
+            }
+
+            if (DateUtils.TryParseStoredDate(session.completedAt, out DateTimeOffset completedAt))
+            {
+                date = completedAt.LocalDateTime.Date;
+                return true;
+            }
+
+            date = default;
+            return false;
         }
     }
 }
