@@ -536,7 +536,7 @@ namespace Pomo.Presentation.Screens
             cellButton.onClick.AddListener(() => SelectDate(date));
 
             CreateText("Date Number", cell, new Vector2(0.05f, 0.78f), new Vector2(0.95f, 0.98f),
-                date.Day.ToString(CultureInfo.InvariantCulture), 15,
+                date.Day.ToString(CultureInfo.InvariantCulture), 35,
                 date.Date == DateTime.Today ? Hex("#FFD166") : Color.white,
                 TextAlignmentOptions.TopLeft);
 
