@@ -250,6 +250,20 @@ namespace Pomo.Presentation.Screens
             ShowTaskForm();
         }
 
+        /// <summary>
+        /// Opens the existing task form with the date chosen in the calendar.
+        /// The normal task entry point remains unchanged and keeps its date empty.
+        /// </summary>
+        public void OpenCreateTaskFormForDate(string dueDate)
+        {
+            OpenCreateTaskForm();
+
+            if (dueDateInput != null && DateUtils.TryParseUiDate(dueDate, out _))
+            {
+                dueDateInput.text = DateUtils.FormatForUi(dueDate);
+            }
+        }
+
         public void RequestCloseEdit()
         {
             if (string.IsNullOrWhiteSpace(editingTaskId))
@@ -390,6 +404,9 @@ namespace Pomo.Presentation.Screens
                     break;
                 case TaskStatusTransitionResult.StatusUnchanged:
                     ShowFeedback("La tarea ya estaba completada.");
+                    break;
+                case TaskStatusTransitionResult.InvalidTransition:
+                    ShowFeedback("La tarea debe iniciarse antes de completarse.");
                     break;
                 default:
                     ShowFeedback("No fue posible encontrar la tarea asociada.");

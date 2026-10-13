@@ -65,9 +65,12 @@ namespace Pomo.Business.Pomodoro
 
             SelectedBlock = block;
 
-            if (SelectedTask == null && !string.IsNullOrWhiteSpace(block.taskId))
+            if (!string.IsNullOrWhiteSpace(block.taskId))
             {
-                SelectTask(block.taskId);
+                TaskModel linkedTask = taskService.GetTask(block.taskId);
+                SelectedTask = linkedTask != null && linkedTask.status != TaskStatus.Completed
+                    ? linkedTask
+                    : null;
             }
 
             return true;
@@ -111,7 +114,22 @@ namespace Pomo.Business.Pomodoro
 
         public bool ToggleFavorite()
         {
-            return SelectedBlock != null && pomodoroService.ToggleFavorite(SelectedBlock.id);
+            return SelectedBlock != null && ToggleFavorite(SelectedBlock.id);
+        }
+
+        public bool ToggleFavorite(string blockId)
+        {
+            if (!pomodoroService.ToggleFavorite(blockId))
+            {
+                return false;
+            }
+
+            if (SelectedBlock != null && SelectedBlock.id == blockId)
+            {
+                SelectedBlock.isFavorite = pomodoroService.IsFavorite(blockId);
+            }
+
+            return true;
         }
 
         public bool IsSelectedBlockFavorite()

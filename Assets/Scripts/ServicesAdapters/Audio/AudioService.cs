@@ -4,8 +4,8 @@ namespace Pomo.ServicesAdapters.Audio
 {
     /// <summary>
     /// Audio integration point. Playback is requested only when sound is
-    /// enabled; a future Unity/Android adapter can subscribe without changing
-    /// timer logic.
+    /// enabled; the presentation controller handles the optional Unity clip
+    /// without coupling timer logic to audio playback.
     /// </summary>
     public class AudioService
     {

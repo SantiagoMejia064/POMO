@@ -83,6 +83,7 @@ namespace Pomo.Business.Tasks
                 description = description,
                 subject = subject,
                 dueDate = parsedDueDate.ToString("O"),
+                createdAt = DateTimeOffset.Now.ToString("O"),
                 status = TaskStatus.NotStarted
             };
 
@@ -210,6 +211,10 @@ namespace Pomo.Business.Tasks
             }
 
             task.status = targetStatus;
+            if (targetStatus == TaskStatus.Completed)
+            {
+                task.completedAt = DateTimeOffset.Now.ToString("O");
+            }
 
             if (!taskRepository.Update(task))
             {
@@ -227,27 +232,7 @@ namespace Pomo.Business.Tasks
 
         public TaskStatusTransitionResult CompleteTaskFromActivity(string taskId)
         {
-            TaskModel task = taskRepository.GetById(taskId);
-
-            if (task == null)
-            {
-                return TaskStatusTransitionResult.TaskNotFound;
-            }
-
-            if (task.status == TaskStatus.Completed)
-            {
-                return TaskStatusTransitionResult.StatusUnchanged;
-            }
-
-            task.status = TaskStatus.Completed;
-
-            if (!taskRepository.Update(task))
-            {
-                return TaskStatusTransitionResult.TaskNotFound;
-            }
-
-            CancelReminderWhenCompleted(task);
-            return TaskStatusTransitionResult.Success;
+            return TransitionStatus(taskId, TaskStatus.Completed);
         }
 
         public bool CanTransition(TaskStatus currentStatus, TaskStatus targetStatus)
@@ -272,15 +257,6 @@ namespace Pomo.Business.Tasks
 
             task.reminderNotificationId = notificationId;
             taskRepository.Update(task);
-        }
-
-        private void CancelReminderWhenCompleted(TaskModel task)
-        {
-            if (task.status == TaskStatus.Completed && notificationService.CancelTaskReminder(task))
-            {
-                task.reminderNotificationId = NotificationService.NoNotificationId;
-                taskRepository.Update(task);
-            }
         }
     }
 }

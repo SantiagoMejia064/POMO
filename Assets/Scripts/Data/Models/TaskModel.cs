@@ -11,6 +11,8 @@ namespace Pomo.Data.Models
         public string description;
         public string subject;
         public string dueDate;
+        public string createdAt;
+        public string completedAt;
         public TaskStatus status;
 
         // Android assigns this identifier when the local deadline reminder is

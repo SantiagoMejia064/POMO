@@ -52,11 +52,17 @@ namespace Pomo.Presentation.Screens
 
         private readonly List<BlockTaskSelectionItemView> taskItems = new List<BlockTaskSelectionItemView>();
         private readonly List<WorkBlockItemView> durationItems = new List<WorkBlockItemView>();
+        private string defaultSelectionRequiredText;
 
         private void Awake()
         {
             AutoWireFavoriteScrollView();
             AutoWireOptionalControls();
+
+            if (selectionRequiredText != null)
+            {
+                defaultSelectionRequiredText = selectionRequiredText.text;
+            }
         }
 
         private void Start()
@@ -102,7 +108,10 @@ namespace Pomo.Presentation.Screens
                     block.focusMinutes,
                     block.breakMinutes,
                     block.isFavorite,
-                    () => SelectFavoriteAndOpenTimer(block.id));
+                    () => SelectFavoriteAndOpenTimer(block.id),
+                    () => ToggleFavorite(block.id));
+                item.SetSelected(pomodoroController.SelectedBlock != null &&
+                    pomodoroController.SelectedBlock.id == block.id);
             }
         }
 
@@ -226,6 +235,8 @@ namespace Pomo.Presentation.Screens
 
                 BlockTaskSelectionItemView item = Instantiate(taskItemPrefab, taskContent);
                 item.Bind(task.title, () => SelectTask(task.id, item));
+                item.SetSelected(pomodoroController.SelectedTask != null &&
+                    pomodoroController.SelectedTask.id == task.id);
                 taskItems.Add(item);
             }
         }
@@ -242,11 +253,6 @@ namespace Pomo.Presentation.Screens
 
             foreach (WorkBlockModel block in pomodoroController.GetAvailableBlocks())
             {
-                if (block.isCustom)
-                {
-                    continue;
-                }
-
                 WorkBlockItemView item = Instantiate(durationItemPrefab, durationContent);
                 item.Bind(
                     block.name,
@@ -254,13 +260,21 @@ namespace Pomo.Presentation.Screens
                     block.focusMinutes,
                     block.breakMinutes,
                     block.isFavorite,
-                    () => SelectBlock(block.id, item));
+                    () => SelectBlock(block.id, item),
+                    () => ToggleFavorite(block.id));
+                item.SetSelected(pomodoroController.SelectedBlock != null &&
+                    pomodoroController.SelectedBlock.id == block.id);
                 durationItems.Add(item);
             }
         }
 
         private void SelectTask(string taskId, BlockTaskSelectionItemView selectedItem)
         {
+            if (!CanChangeSessionSelection())
+            {
+                return;
+            }
+
             if (!pomodoroController.TrySelectTask(taskId))
             {
                 return;
@@ -277,6 +291,11 @@ namespace Pomo.Presentation.Screens
 
         private void SelectBlock(string blockId, WorkBlockItemView selectedItem)
         {
+            if (!CanChangeSessionSelection())
+            {
+                return;
+            }
+
             if (!pomodoroController.TrySelectBlock(blockId))
             {
                 return;
@@ -293,6 +312,11 @@ namespace Pomo.Presentation.Screens
 
         private void SelectFavoriteAndOpenTimer(string blockId)
         {
+            if (!CanChangeSessionSelection())
+            {
+                return;
+            }
+
             if (pomodoroController == null ||
                 !pomodoroController.TrySelectBlock(blockId) ||
                 !pomodoroController.TryPrepareBlock())
@@ -324,8 +348,41 @@ namespace Pomo.Presentation.Screens
         {
             if (selectionRequiredText != null)
             {
+                if (!shouldShow && !string.IsNullOrEmpty(defaultSelectionRequiredText))
+                {
+                    selectionRequiredText.text = defaultSelectionRequiredText;
+                }
+
                 selectionRequiredText.gameObject.SetActive(shouldShow);
             }
+        }
+
+        private bool CanChangeSessionSelection()
+        {
+            if (pomodoroController == null || pomodoroController.CanChangeSessionSelection)
+            {
+                return true;
+            }
+
+            if (selectionRequiredText != null)
+            {
+                selectionRequiredText.text = "Termina o reinicia el ciclo antes de cambiar la tarea o el bloque.";
+                selectionRequiredText.gameObject.SetActive(true);
+            }
+
+            return false;
+        }
+
+        private void ToggleFavorite(string blockId)
+        {
+            if (pomodoroController == null || !pomodoroController.ToggleFavorite(blockId))
+            {
+                return;
+            }
+
+            RefreshConfigurationLists();
+            RefreshFavoriteBlocks();
+            SelectionChanged?.Invoke();
         }
 
         private void AutoWireOptionalControls()

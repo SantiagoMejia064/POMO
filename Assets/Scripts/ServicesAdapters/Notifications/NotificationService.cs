@@ -20,6 +20,7 @@ namespace Pomo.ServicesAdapters.Notifications
 
         private const int ReminderHour = 9;
         private const string TaskReminderChannelId = "pomo-task-reminders";
+        private const string CycleReminderChannelId = "pomo-cycle-reminders";
 
 #if UNITY_ANDROID
         private static PermissionRequest permissionRequest;
@@ -75,6 +76,43 @@ namespace Pomo.ServicesAdapters.Notifications
         }
 
         /// <summary>
+        /// Notifies the user when a focus phase ends and the break begins.
+        /// In the Editor and on other platforms, logs the event for verification.
+        /// </summary>
+        public int NotifyBreakStarted(string taskTitle)
+        {
+            string notificationText = string.IsNullOrWhiteSpace(taskTitle)
+                ? "Tu bloque de trabajo terminó. Es momento de descansar."
+                : $"Terminaste el bloque de trabajo de \"{taskTitle}\". Es momento de descansar.";
+
+#if UNITY_ANDROID
+            EnsureCycleNotificationChannel();
+            RequestPermissionIfNeeded();
+
+            AndroidNotification notification = new AndroidNotification
+            {
+                Title = "¡Buen trabajo! Tómate un descanso",
+                Text = notificationText,
+                FireTime = DateTime.Now.AddSeconds(1),
+                ShouldAutoCancel = true
+            };
+
+            int notificationId = AndroidNotificationCenter.SendNotification(notification, CycleReminderChannelId);
+            if (notificationId > 0)
+            {
+                Debug.Log($"Recordatorio de descanso enviado: {notificationText}");
+                return notificationId;
+            }
+
+            Debug.LogWarning("Android no pudo programar el recordatorio de descanso.");
+            return NoNotificationId;
+#else
+            Debug.Log($"POMO: recordatorio de descanso detectado: {notificationText}");
+            return NoNotificationId;
+#endif
+        }
+
+        /// <summary>
         /// Cancels both a pending and an already displayed reminder.
         /// </summary>
         public bool CancelTaskReminder(TaskModel task)
@@ -96,6 +134,21 @@ namespace Pomo.ServicesAdapters.Notifications
         }
 
 #if UNITY_ANDROID
+        private static void EnsureCycleNotificationChannel()
+        {
+            AndroidNotificationChannel channel = new AndroidNotificationChannel
+            {
+                Id = CycleReminderChannelId,
+                Name = "Recordatorios Pomodoro",
+                Description = "Avisos al terminar un bloque de trabajo e iniciar el descanso.",
+                Importance = Importance.High,
+                CanShowBadge = true,
+                EnableVibration = true
+            };
+
+            AndroidNotificationCenter.RegisterNotificationChannel(channel);
+        }
+
         private static void EnsureNotificationChannel()
         {
             AndroidNotificationChannel channel = new AndroidNotificationChannel

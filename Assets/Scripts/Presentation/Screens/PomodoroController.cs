@@ -5,7 +5,9 @@ using Pomo.Business.Progress;
 using Pomo.Business.Tasks;
 using Pomo.Data.Models;
 using Pomo.ServicesAdapters.Audio;
+using Pomo.ServicesAdapters.Notifications;
 using Pomo.Shared.Enums;
+using Pomo.Shared.Utilities;
 using UnityEngine;
 
 namespace Pomo.Presentation.Screens
@@ -20,7 +22,14 @@ namespace Pomo.Presentation.Screens
         private PomodoroTimer timer;
         private BlockSessionService sessionService;
         private AudioService audioService;
+        private NotificationService notificationService;
         private ProgressService progressService;
+        private TaskService taskService;
+        private DateTimeOffset activeFocusStartedAt;
+
+        [Header("Audio de fin de ciclo")]
+        [SerializeField] private AudioSource cycleCompletionAudioSource;
+        [SerializeField] private AudioClip cycleCompletionClip;
 
         public float RemainingSeconds => timer?.RemainingSeconds ?? 0f;
         public int CurrentPhaseDurationSeconds => timer?.CurrentPhaseDurationSeconds ?? 0;
@@ -30,6 +39,10 @@ namespace Pomo.Presentation.Screens
         public bool IsSoundEnabled => audioService != null && audioService.IsEnabled;
         public bool IsBlockReady => sessionService != null && sessionService.IsReady;
         public bool HasTaskAndBlock => sessionService != null && sessionService.HasTaskAndBlock;
+        public bool CanChangeSessionSelection => timer == null ||
+            (timer.State != PomodoroTimerState.Running &&
+             timer.State != PomodoroTimerState.Paused &&
+             timer.State != PomodoroTimerState.Resting);
         public TaskModel SelectedTask => sessionService?.SelectedTask;
         public WorkBlockModel SelectedBlock => sessionService?.SelectedBlock;
 
@@ -44,13 +57,15 @@ namespace Pomo.Presentation.Screens
         {
             timer = new PomodoroTimer();
             audioService = new AudioService();
-            sessionService = new BlockSessionService(new TaskService(), new PomodoroService());
+            notificationService = new NotificationService();
+            taskService = new TaskService();
+            sessionService = new BlockSessionService(taskService, new PomodoroService());
             progressService = new ProgressService();
 
             timer.StateChanged += state => StateChanged?.Invoke(state);
             timer.WorkCompleted += OnWorkCompleted;
             timer.RestCompleted += () => RestCompleted?.Invoke();
-            audioService.PlaybackRequested += () => SoundRequested?.Invoke();
+            audioService.PlaybackRequested += OnCycleCompletedPlaybackRequested;
         }
 
         private void Update()
@@ -65,7 +80,7 @@ namespace Pomo.Presentation.Screens
 
         public bool TrySelectTask(string taskId)
         {
-            return sessionService.SelectTask(taskId);
+            return CanChangeSessionSelection && sessionService.SelectTask(taskId);
         }
 
         public IReadOnlyList<TaskModel> GetAvailableTasks()
@@ -95,7 +110,7 @@ namespace Pomo.Presentation.Screens
 
         public bool TrySelectBlock(string blockId)
         {
-            return sessionService.SelectBlock(blockId);
+            return CanChangeSessionSelection && sessionService.SelectBlock(blockId);
         }
 
         public void PrepareBlock()
@@ -105,6 +120,11 @@ namespace Pomo.Presentation.Screens
 
         public bool TryPrepareBlock()
         {
+            if (!CanChangeSessionSelection)
+            {
+                return false;
+            }
+
             bool prepared = sessionService.ConfigureTimer(timer);
 
             if (prepared)
@@ -122,12 +142,17 @@ namespace Pomo.Presentation.Screens
 
         public bool TrySaveSelectedBlock(string name)
         {
-            return sessionService != null && sessionService.TrySaveSelectedBlock(name, out _);
+            return CanChangeSessionSelection &&
+                   sessionService != null &&
+                   sessionService.TrySaveSelectedBlock(name, out _);
         }
 
         public void StartBlock()
         {
-            timer.Start();
+            if (timer.Start())
+            {
+                activeFocusStartedAt = DateTimeOffset.Now;
+            }
         }
 
         public void Pause()
@@ -150,6 +175,11 @@ namespace Pomo.Presentation.Screens
             sessionService.ToggleFavorite();
         }
 
+        public bool ToggleFavorite(string blockId)
+        {
+            return sessionService != null && sessionService.ToggleFavorite(blockId);
+        }
+
         public string GetTaskTitleForBlock(WorkBlockModel block)
         {
             return sessionService.GetTaskTitleForBlock(block);
@@ -163,13 +193,48 @@ namespace Pomo.Presentation.Screens
         private void OnWorkCompleted()
         {
             TaskModel selectedTask = sessionService.SelectedTask;
+            DateTimeOffset completedAt = DateTimeOffset.Now;
+            DateTimeOffset startedAt = activeFocusStartedAt == default
+                ? completedAt.AddSeconds(-timer.FocusDurationSeconds)
+                : activeFocusStartedAt;
+            taskService.ReloadStoredTasks();
+            TaskModel currentTask = selectedTask == null ? null : taskService.GetTask(selectedTask.id);
+            bool taskCompletedDuringBlock = currentTask != null &&
+                currentTask.status == TaskStatus.Completed &&
+                DateUtils.TryParseStoredDate(currentTask.completedAt, out DateTimeOffset taskCompletedAt) &&
+                taskCompletedAt >= startedAt && taskCompletedAt <= completedAt;
+
             progressService.RecordCompletedFocusBlock(
                 timer.FocusDurationSeconds,
-                DateTime.Today,
+                completedAt.LocalDateTime.Date,
                 selectedTask?.id,
-                selectedTask?.title);
+                selectedTask?.title,
+                Guid.NewGuid().ToString(),
+                startedAt,
+                completedAt,
+                taskCompletedDuringBlock);
+            activeFocusStartedAt = default;
             audioService.RequestCycleCompletedPlayback();
+            notificationService.NotifyBreakStarted(selectedTask?.title);
             WorkCompleted?.Invoke();
+        }
+
+        private void OnCycleCompletedPlaybackRequested()
+        {
+            if (cycleCompletionAudioSource != null && cycleCompletionClip != null)
+            {
+                cycleCompletionAudioSource.PlayOneShot(cycleCompletionClip);
+                Debug.Log("POMO: se reprodujo el sonido de finalización del ciclo.", this);
+            }
+            else
+            {
+                Debug.Log(
+                    "POMO: finalizó el ciclo de trabajo; evento de sonido detectado. " +
+                    "Asigna el AudioSource y el AudioClip en PomodoroController para reproducirlo.",
+                    this);
+            }
+
+            SoundRequested?.Invoke();
         }
     }
 }

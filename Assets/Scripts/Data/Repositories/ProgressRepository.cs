@@ -41,7 +41,62 @@ namespace Pomo.Data.Repositories
 
         public DailyProgressModel GetByDate(string date)
         {
+            Reload();
             return storedProgress.dailyProgress.Find(item => item != null && item.date == date);
+        }
+
+        public IReadOnlyList<CompletedFocusBlockModel> GetCompletedStudySessions()
+        {
+            Reload();
+            List<CompletedFocusBlockModel> sessions = new List<CompletedFocusBlockModel>();
+
+            foreach (DailyProgressModel progress in storedProgress.dailyProgress)
+            {
+                if (progress?.completedBlocks == null)
+                {
+                    continue;
+                }
+
+                sessions.AddRange(progress.completedBlocks.FindAll(block =>
+                    block != null && !string.IsNullOrWhiteSpace(block.sessionId)));
+            }
+
+            return sessions.AsReadOnly();
+        }
+
+        public IReadOnlyList<TrophyAwardModel> GetTrophyAwards()
+        {
+            Reload();
+            return storedProgress.trophyAwards.AsReadOnly();
+        }
+
+        public int GetTotalTrophies()
+        {
+            Reload();
+            int total = 0;
+            foreach (TrophyAwardModel award in storedProgress.trophyAwards)
+            {
+                if (award != null && award.trophyAmount > 0)
+                {
+                    total += award.trophyAmount;
+                }
+            }
+
+            return total;
+        }
+
+        public bool TryRecordTrophyAward(TrophyAwardModel award)
+        {
+            Reload();
+            if (award == null || string.IsNullOrWhiteSpace(award.taskId) || award.trophyAmount <= 0 ||
+                storedProgress.trophyAwards.Exists(existing => existing != null && existing.taskId == award.taskId))
+            {
+                return false;
+            }
+
+            storedProgress.trophyAwards.Add(award);
+            Save();
+            return true;
         }
 
         public void Save()
@@ -57,6 +112,7 @@ namespace Pomo.Data.Repositories
             }
 
             storedProgress.dailyProgress ??= new List<DailyProgressModel>();
+            storedProgress.trophyAwards ??= new List<TrophyAwardModel>();
 
             foreach (DailyProgressModel progress in storedProgress.dailyProgress)
             {

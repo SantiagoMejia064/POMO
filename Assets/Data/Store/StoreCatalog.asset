@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7516649c86b802445879923dca9a398f, type: 3}
+  m_Name: StoreCatalog
+  m_EditorClassIdentifier: Assembly-CSharp::Pomo.Data.Models.StoreCatalog
+  items:
+  - {fileID: 11400000, guid: 1bbb7ffe25aa8dc4bb6a57892f6944b9, type: 2}
+  - {fileID: 11400000, guid: 0761262ed0a68cc469e20d9be5bb798c, type: 2}
+  - {fileID: 11400000, guid: 7e4cb134f167317458ddab444a8d14cc, type: 2}
+  - {fileID: 11400000, guid: 7c8a6bfdeffa1bb4891b6347b0799a3c, type: 2}
+  - {fileID: 11400000, guid: b4fc12c4b4d729e4f888fb2a856cfeec, type: 2}

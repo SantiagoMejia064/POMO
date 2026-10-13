@@ -5,5 +5,6 @@ namespace Pomo.Shared.Constants
         public const string TasksFileName = "tasks.json";
         public const string WorkBlocksFileName = "work-blocks.json";
         public const string ProgressFileName = "progress.json";
+        public const string StoreInventoryFileName = "store-inventory.json";
     }
 }
