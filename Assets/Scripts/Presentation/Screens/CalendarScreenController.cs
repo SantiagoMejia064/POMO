@@ -592,10 +592,7 @@ namespace Pomo.Presentation.Screens
 
             if (tasksScreenController != null)
             {
-                ActivateTasksSection();
-                HideWorkSection();
-                gameObject.SetActive(false);
-                tasksScreenController.ShowTaskDetail(taskId);
+                tasksScreenController.ShowCalendarEditSummary(taskId);
             }
         }
 

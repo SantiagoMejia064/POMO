@@ -30,6 +30,10 @@ namespace Pomo.Presentation.Screens
         public GameObject taskListPanel;
         public GameObject taskFormPanel;
 
+        [Header("Navegación")]
+        [SerializeField] private GameObject tasksSection;
+        [SerializeField] private GameObject homePanel;
+
         [Header("Lista de tareas")]
         public RectTransform taskListContent;
         public GameObject taskItemPrefab;
@@ -60,6 +64,11 @@ namespace Pomo.Presentation.Screens
         public TMP_InputField editSubjectInput;
         public TMP_InputField editDueDateInput;
 
+        [Header("Resumen de edici\u00f3n desde calendario")]
+        [SerializeField] private GameObject calendarEditSummaryPanel;
+        [SerializeField] private TMP_Text calendarTaskNameText;
+        [SerializeField] private TMP_Text calendarTaskSubjectText;
+
         [Header("Confirmaciones de edición")]
         public GameObject savedChangesPanel;
         public GameObject unsavedChangesPanel;
@@ -78,7 +87,9 @@ namespace Pomo.Presentation.Screens
         private WorkBlocksScreenController workBlocksScreenController;
         private string editingTaskId;
         private string detailTaskId;
+        private string calendarSelectedTaskId;
         private Action pendingDeleteAction;
+        private bool taskDetailOpenedFromCalendar;
 
         private void Awake()
         {
@@ -117,6 +128,11 @@ namespace Pomo.Presentation.Screens
             if (editTaskPanel != null)
             {
                 editTaskPanel.SetActive(false);
+            }
+
+            if (calendarEditSummaryPanel != null)
+            {
+                calendarEditSummaryPanel.SetActive(false);
             }
 
             if (savedChangesPanel != null)
@@ -192,6 +208,18 @@ namespace Pomo.Presentation.Screens
 
         public void ShowTaskDetail(string taskId)
         {
+            taskDetailOpenedFromCalendar = false;
+            ShowTaskDetailInternal(taskId);
+        }
+
+        public void ShowTaskDetailFromCalendar(string taskId)
+        {
+            taskDetailOpenedFromCalendar = true;
+            ShowTaskDetailInternal(taskId);
+        }
+
+        private void ShowTaskDetailInternal(string taskId)
+        {
             TaskModel task = taskService.GetTask(taskId);
 
             if (task == null)
@@ -219,7 +247,48 @@ namespace Pomo.Presentation.Screens
                 return;
             }
 
+            if (taskDetailOpenedFromCalendar)
+            {
+                ShowCalendarEditSummary(detailTaskId);
+                return;
+            }
+
             BeginEdit(detailTaskId);
+        }
+
+        public void CloseCalendarEditSummary()
+        {
+            if (calendarEditSummaryPanel != null)
+            {
+                calendarEditSummaryPanel.SetActive(false);
+            }
+
+            calendarSelectedTaskId = null;
+            taskDetailOpenedFromCalendar = false;
+            FindObjectOfType<CalendarScreenController>()?.RefreshCalendar();
+        }
+
+        public void SaveCalendarEditSummary()
+        {
+            CloseCalendarEditSummary();
+        }
+
+        public void DeleteCalendarSelectedTask()
+        {
+            if (string.IsNullOrWhiteSpace(calendarSelectedTaskId))
+            {
+                ShowFeedback("No hay una tarea seleccionada para eliminar.");
+                return;
+            }
+
+            if (!taskService.DeleteTask(calendarSelectedTaskId))
+            {
+                ShowFeedback("No fue posible eliminar la tarea.");
+                return;
+            }
+
+            CloseCalendarEditSummary();
+            ShowFeedback("Tarea eliminada correctamente.");
         }
 
         public void CloseTaskDetail()
@@ -240,6 +309,22 @@ namespace Pomo.Presentation.Screens
             SetTaskPanels(true, false, false);
 
             taskListController?.RefreshTaskList();
+        }
+
+        /// <summary>Entry point for the home-screen Tareas button.</summary>
+        public void OpenTasks()
+        {
+            if (tasksSection != null)
+            {
+                tasksSection.SetActive(true);
+            }
+
+            if (homePanel != null)
+            {
+                homePanel.SetActive(false);
+            }
+
+            ShowTaskList();
         }
 
         public void ShowTaskForm()
@@ -610,12 +695,39 @@ namespace Pomo.Presentation.Screens
             }
         }
 
+        public void ShowCalendarEditSummary(string taskId)
+        {
+            TaskModel task = taskService.GetTask(taskId);
+
+            if (task == null)
+            {
+                ShowFeedback("No fue posible encontrar la tarea seleccionada.");
+                return;
+            }
+
+            if (calendarEditSummaryPanel == null ||
+                calendarTaskNameText == null ||
+                calendarTaskSubjectText == null)
+            {
+                ShowFeedback("Asigna el panel y los textos de nombre y asignatura para la edici\u00f3n desde calendario.");
+                return;
+            }
+
+            calendarTaskNameText.text = task.title ?? string.Empty;
+            calendarTaskSubjectText.text = task.subject ?? string.Empty;
+            calendarSelectedTaskId = task.id;
+
+            SetTaskPanels(false, false, false);
+            calendarEditSummaryPanel.SetActive(true);
+        }
+
         private void SetTaskPanels(bool showList, bool showCreateForm, bool showDetail)
         {
             if (taskListPanel != null) taskListPanel.SetActive(showList);
             if (taskFormPanel != null) taskFormPanel.SetActive(showCreateForm);
             if (taskDetailPanel != null) taskDetailPanel.SetActive(showDetail);
             if (editTaskPanel != null) editTaskPanel.SetActive(false);
+            if (calendarEditSummaryPanel != null) calendarEditSummaryPanel.SetActive(false);
         }
 
         private string GetStatusLabelForDetail(TaskModel task)
