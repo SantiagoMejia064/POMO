@@ -28,6 +28,9 @@ namespace Pomo.Business.Pomodoro
 
         public IReadOnlyList<TaskModel> GetAvailableTasks()
         {
+            // Las tareas pueden crearse desde otra pantalla con otra instancia
+            // de TaskService; recargamos antes de poblar el selector de bloques.
+            taskService.ReloadStoredTasks();
             return taskService.GetStoredTasks();
         }
 
@@ -43,6 +46,7 @@ namespace Pomo.Business.Pomodoro
 
         public bool SelectTask(string taskId)
         {
+            taskService.ReloadStoredTasks();
             TaskModel task = taskService.GetTask(taskId);
 
             if (task == null || task.status == TaskStatus.Completed)
