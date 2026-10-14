@@ -14,32 +14,38 @@ namespace Pomo.Presentation.Screens
         [SerializeField] private GameObject selectProgressPanel;
         [SerializeField] private GameObject dailyProgressPanel;
         [SerializeField] private GameObject weeklyProgressPanel;
+        [SerializeField] private GameObject weeklySummaryPanel;
         [SerializeField] private DailyProgressTextView dailyProgressView;
 
         public void OpenProgress()
         {
-            SetPanelStates(true, true, false, false, false);
+            SetPanelStates(true, true, false, false, false, false);
         }
 
         public void OpenDailyProgress()
         {
-            SetPanelStates(true, false, true, false, false);
+            SetPanelStates(true, false, true, false, false, false);
             dailyProgressView?.Refresh();
         }
 
         public void OpenWeeklyProgress()
         {
-            SetPanelStates(true, false, false, true, false);
+            SetPanelStates(true, false, false, true, false, false);
+        }
+
+        public void OpenWeeklySummary()
+        {
+            SetPanelStates(true, false, false, false, true, false);
         }
 
         public void ReturnToProgressSelection()
         {
-            SetPanelStates(true, true, false, false, false);
+            SetPanelStates(true, true, false, false, false, false);
         }
 
         public void ReturnToHome()
         {
-            SetPanelStates(false, false, false, false, true);
+            SetPanelStates(false, false, false, false, false, true);
         }
 
         private void SetPanelStates(
@@ -47,12 +53,14 @@ namespace Pomo.Presentation.Screens
             bool showSelection,
             bool showDaily,
             bool showWeekly,
+            bool showWeeklySummary,
             bool showHome)
         {
             if (progressSection != null) progressSection.SetActive(showProgressSection);
             if (selectProgressPanel != null) selectProgressPanel.SetActive(showSelection);
             if (dailyProgressPanel != null) dailyProgressPanel.SetActive(showDaily);
             if (weeklyProgressPanel != null) weeklyProgressPanel.SetActive(showWeekly);
+            if (weeklySummaryPanel != null) weeklySummaryPanel.SetActive(showWeeklySummary);
             if (homePanel != null) homePanel.SetActive(showHome);
         }
     }
