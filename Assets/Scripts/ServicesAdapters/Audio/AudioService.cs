@@ -2,6 +2,14 @@ using System;
 
 namespace Pomo.ServicesAdapters.Audio
 {
+    public enum SoundCue
+    {
+        MemoryMatch,
+        MemoryMismatch,
+        MemoryRoundCompleted,
+        MemoryTimeUp
+    }
+
     /// <summary>
     /// Audio integration point. Playback is requested only when sound is
     /// enabled; the presentation controller handles the optional Unity clip
@@ -9,13 +17,17 @@ namespace Pomo.ServicesAdapters.Audio
     /// </summary>
     public class AudioService
     {
-        public bool IsEnabled { get; private set; } = true;
+        // La preferencia se comparte entre Trabajo y Minijuegos durante esta sesión.
+        private static bool sessionSoundEnabled = true;
+
+        public bool IsEnabled => sessionSoundEnabled;
 
         public event Action PlaybackRequested;
+        public event Action<SoundCue> CuePlaybackRequested;
 
         public void SetEnabled(bool enabled)
         {
-            IsEnabled = enabled;
+            sessionSoundEnabled = enabled;
         }
 
         public void RequestCycleCompletedPlayback()
@@ -23,6 +35,14 @@ namespace Pomo.ServicesAdapters.Audio
             if (IsEnabled)
             {
                 PlaybackRequested?.Invoke();
+            }
+        }
+
+        public void RequestCuePlayback(SoundCue cue)
+        {
+            if (IsEnabled)
+            {
+                CuePlaybackRequested?.Invoke(cue);
             }
         }
     }
