@@ -10,5 +10,8 @@ namespace Pomo.Data.DTOs
         public List<DailyProgressModel> dailyProgress = new List<DailyProgressModel>();
         public List<TrophyAwardModel> trophyAwards = new List<TrophyAwardModel>();
         public int cupsBalance;
+        // Explicit, removable Editor fixtures; never counted as real Progress or rewards.
+        public bool rhythmDemoInitialized;
+        public List<CompletedFocusBlockModel> rhythmDemoSessions = new List<CompletedFocusBlockModel>();
     }
 }

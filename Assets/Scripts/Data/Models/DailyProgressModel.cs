@@ -11,5 +11,7 @@ namespace Pomo.Data.Models
         public int completedFocusBlocks;
         public int workedSeconds;
         public List<CompletedFocusBlockModel> completedBlocks = new List<CompletedFocusBlockModel>();
+        // Same JSON, separate collection: interrupted work never earns completed-block credit.
+        public List<CompletedFocusBlockModel> interruptedBlocks = new List<CompletedFocusBlockModel>();
     }
 }

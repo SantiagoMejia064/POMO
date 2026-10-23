@@ -9,6 +9,7 @@ using Unity.Notifications.Android;
 
 namespace Pomo.ServicesAdapters.Notifications
 {
+    public enum RhythmNotificationResult { Scheduled, EditorPreview, PermissionPending, Failed }
     /// <summary>
     /// Schedules device-local reminders for task deadlines. The task form only
     /// collects a date, so reminders are consistently delivered at 09:00 local
@@ -21,6 +22,97 @@ namespace Pomo.ServicesAdapters.Notifications
         private const int ReminderHour = 9;
         private const string TaskReminderChannelId = "pomo-task-reminders";
         private const string CycleReminderChannelId = "pomo-cycle-reminders";
+        private const string RhythmChannelId = "pomo-rhythm-reminders";
+
+        public bool RhythmPermissionPending
+        {
+            get
+            {
+#if UNITY_ANDROID && !UNITY_EDITOR
+                return AndroidNotificationCenter.UserPermissionToPost == PermissionStatus.RequestPending;
+#else
+                return false;
+#endif
+            }
+        }
+
+        public RhythmNotificationResult ScheduleRhythmReminder(RhythmReminderModel reminder, out string message)
+        {
+            message = string.Empty;
+            if (reminder == null || !DateUtils.TryParseStoredDate(reminder.scheduledAt, out DateTimeOffset scheduled) ||
+                scheduled <= DateTimeOffset.Now)
+            {
+                message = "Selecciona una fecha y una hora futuras.";
+                return RhythmNotificationResult.Failed;
+            }
+#if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {
+                var permission = AndroidNotificationCenter.UserPermissionToPost;
+                if (permission != PermissionStatus.Allowed)
+                {
+                    if (permission == PermissionStatus.NotRequested || permission == PermissionStatus.RequestPending)
+                    {
+                        RequestPermissionIfNeeded();
+                        message = "Acepta el permiso de notificaciones para continuar.";
+                        return RhythmNotificationResult.PermissionPending;
+                    }
+                    message = "Activa las notificaciones de POMO en los ajustes de Android y vuelve a confirmar.";
+                    return RhythmNotificationResult.Failed;
+                }
+                if (!AndroidNotificationCenter.UsingExactScheduling)
+                {
+                    AndroidNotificationCenter.RequestExactScheduling();
+                    message = "Permite alarmas exactas en Android y confirma otra vez. El aviso aún no está programado.";
+                    return RhythmNotificationResult.Failed;
+                }
+                AndroidNotificationCenter.RegisterNotificationChannel(new AndroidNotificationChannel
+                {
+                    Id = RhythmChannelId, Name = "Recordatorios de Ritmo", Description = "Horarios de estudio elegidos por el estudiante.",
+                    Importance = Importance.High
+                });
+                if (AndroidNotificationCenter.CheckScheduledNotificationStatus(reminder.notificationId) != NotificationStatus.Scheduled)
+                    AndroidNotificationCenter.SendNotificationWithExplicitID(new AndroidNotification
+                    {
+                        Title = "Es tu momento de estudiar", Text = reminder.name,
+                        FireTime = scheduled.LocalDateTime, ShouldAutoCancel = true
+                    }, RhythmChannelId, reminder.notificationId);
+
+                if (AndroidNotificationCenter.CheckScheduledNotificationStatus(reminder.notificationId) == NotificationStatus.Scheduled)
+                    return RhythmNotificationResult.Scheduled;
+                message = "Android no confirmó el aviso. Reintenta: se conservará el mismo recordatorio.";
+                return RhythmNotificationResult.Failed;
+            }
+            catch (Exception)
+            {
+                message = "No se pudo programar la notificación en Android. Revisa los permisos y vuelve a intentarlo.";
+                return RhythmNotificationResult.Failed;
+            }
+#elif UNITY_EDITOR
+            message = "Editor: guardado local; la notificación Android sigue pendiente.";
+            return RhythmNotificationResult.EditorPreview;
+#else
+            message = "Las notificaciones de Ritmo requieren un dispositivo Android.";
+            return RhythmNotificationResult.Failed;
+#endif
+        }
+
+        public bool RhythmReminderWasDelivered(int id)
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            return AndroidNotificationCenter.CheckScheduledNotificationStatus(id) == NotificationStatus.Delivered;
+#else
+            return false;
+#endif
+        }
+
+        public void CancelRhythmReminder(int id)
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            AndroidNotificationCenter.CancelScheduledNotification(id);
+            AndroidNotificationCenter.CancelDisplayedNotification(id);
+#endif
+        }
 
 #if UNITY_ANDROID
         private static PermissionRequest permissionRequest;

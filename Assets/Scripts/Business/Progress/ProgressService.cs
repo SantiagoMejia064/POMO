@@ -22,6 +22,7 @@ namespace Pomo.Business.Progress
         public const int CompletedFocusBlockCupsReward = 20;
 
         public static event Action<int> CupsBalanceChanged;
+        public static event Action StudySessionsChanged;
 
         public ProgressService()
             : this(new ProgressRepository(), new TaskService())
@@ -173,6 +174,18 @@ namespace Pomo.Business.Progress
             return progressRepository.GetCompletedStudySessions();
         }
 
+        public IReadOnlyList<CompletedFocusBlockModel> GetRecordedStudySessions()
+        {
+            return progressRepository.GetRecordedStudySessions();
+        }
+
+        public DailyProgressModel RecordFocusSession(CompletedFocusBlockModel session)
+        {
+            if (!progressRepository.TryRecordFocusSession(session, out DailyProgressModel day)) return null;
+            StudySessionsChanged?.Invoke();
+            return day;
+        }
+
         public DailyProgressModel RecordCompletedFocusBlock(
             int focusSeconds,
             DateTime date,
@@ -206,10 +219,7 @@ namespace Pomo.Business.Progress
                 return null;
             }
 
-            DailyProgressModel progress = progressRepository.GetOrCreate(date.ToString("yyyy-MM-dd"));
-            progress.completedFocusBlocks++;
-            progress.workedSeconds += focusSeconds;
-            progress.completedBlocks.Add(new CompletedFocusBlockModel
+            return RecordFocusSession(new CompletedFocusBlockModel
             {
                 sessionId = string.IsNullOrWhiteSpace(sessionId) ? Guid.NewGuid().ToString() : sessionId,
                 sessionDate = date.ToString("yyyy-MM-dd"),
@@ -220,8 +230,6 @@ namespace Pomo.Business.Progress
                 workedSeconds = focusSeconds,
                 taskCompleted = taskCompleted
             });
-            progressRepository.Save();
-            return progress;
         }
 
         public DailyProgressModel GetProgressForDate(DateTime date)

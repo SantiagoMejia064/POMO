@@ -26,6 +26,11 @@ namespace Pomo.Presentation.Screens
         private ProgressService progressService;
         private TaskService taskService;
         private DateTimeOffset activeFocusStartedAt;
+        private string activeSessionId;
+        private TaskModel activeSessionTask;
+        private DateTimeOffset intervalStartedAt;
+        private double intervalWorkedSeconds;
+        private readonly List<FocusWorkIntervalModel> focusIntervals = new List<FocusWorkIntervalModel>();
 
         [Header("Audio de fin de ciclo")]
         [SerializeField] private AudioSource cycleCompletionAudioSource;
@@ -77,8 +82,19 @@ namespace Pomo.Presentation.Screens
 
         private void Update()
         {
+            if (timer.State == PomodoroTimerState.Running && !timer.IsRestPhase && activeSessionId != null)
+                intervalWorkedSeconds += Math.Min(Math.Max(0f, Time.deltaTime), timer.RemainingSeconds);
             timer.Advance(Time.deltaTime);
         }
+
+        private void OnApplicationPause(bool paused)
+        {
+            // Background time is never credited as focus work. Resume explicitly on return.
+            if (paused) Pause();
+        }
+
+        private void OnApplicationQuit() => RecordInterruptedFocus();
+        private void OnDestroy() => RecordInterruptedFocus();
 
         public void SelectTask(string taskId)
         {
@@ -165,21 +181,32 @@ namespace Pomo.Presentation.Screens
             if (timer.Start())
             {
                 activeFocusStartedAt = DateTimeOffset.Now;
+                activeSessionId = Guid.NewGuid().ToString();
+                activeSessionTask = sessionService.SelectedTask;
+                focusIntervals.Clear();
+                intervalStartedAt = activeFocusStartedAt;
+                intervalWorkedSeconds = 0;
             }
         }
 
         public void Pause()
         {
+            if (timer.State == PomodoroTimerState.Running && !timer.IsRestPhase) CloseFocusInterval();
             timer.Pause();
         }
 
         public void Resume()
         {
-            timer.Resume();
+            if (timer.Resume() && !timer.IsRestPhase)
+            {
+                intervalStartedAt = DateTimeOffset.Now;
+                intervalWorkedSeconds = 0;
+            }
         }
 
         public void ResetTimer()
         {
+            RecordInterruptedFocus();
             timer.Reset();
         }
 
@@ -205,7 +232,8 @@ namespace Pomo.Presentation.Screens
 
         private void OnWorkCompleted()
         {
-            TaskModel selectedTask = sessionService.SelectedTask;
+            CloseFocusInterval();
+            TaskModel selectedTask = activeSessionTask ?? sessionService.SelectedTask;
             DateTimeOffset completedAt = DateTimeOffset.Now;
             DateTimeOffset startedAt = activeFocusStartedAt == default
                 ? completedAt.AddSeconds(-timer.FocusDurationSeconds)
@@ -217,15 +245,20 @@ namespace Pomo.Presentation.Screens
                 DateUtils.TryParseStoredDate(currentTask.completedAt, out DateTimeOffset taskCompletedAt) &&
                 taskCompletedAt >= startedAt && taskCompletedAt <= completedAt;
 
-            DailyProgressModel recordedProgress = progressService.RecordCompletedFocusBlock(
-                timer.FocusDurationSeconds,
-                completedAt.LocalDateTime.Date,
-                selectedTask?.id,
-                selectedTask?.title,
-                Guid.NewGuid().ToString(),
-                startedAt,
-                completedAt,
-                taskCompletedDuringBlock);
+            DailyProgressModel recordedProgress = progressService.RecordFocusSession(new CompletedFocusBlockModel
+            {
+                sessionId = activeSessionId ?? Guid.NewGuid().ToString(),
+                sessionDate = completedAt.LocalDateTime.ToString("yyyy-MM-dd"),
+                startedAt = startedAt.ToString("O"),
+                completedAt = completedAt.ToString("O"),
+                taskId = selectedTask?.id ?? string.Empty,
+                taskTitle = selectedTask?.title ?? "Sin tarea asignada",
+                workedSeconds = timer.FocusDurationSeconds,
+                plannedSeconds = timer.FocusDurationSeconds,
+                recordingVersion = 1,
+                taskCompleted = taskCompletedDuringBlock,
+                workIntervals = new List<FocusWorkIntervalModel>(focusIntervals)
+            });
 
             if (recordedProgress != null &&
                 progressService.AddCups(ProgressService.CompletedFocusBlockCupsReward))
@@ -235,9 +268,57 @@ namespace Pomo.Presentation.Screens
             }
 
             activeFocusStartedAt = default;
+            activeSessionId = null;
+            activeSessionTask = null;
+            focusIntervals.Clear();
             audioService.RequestCycleCompletedPlayback();
             notificationService.NotifyBreakStarted(selectedTask?.title);
             WorkCompleted?.Invoke();
+        }
+
+        private void CloseFocusInterval()
+        {
+            if (activeSessionId == null || intervalStartedAt == default) return;
+            DateTimeOffset end = DateTimeOffset.Now;
+            if (intervalWorkedSeconds > 0 && end > intervalStartedAt)
+                focusIntervals.Add(new FocusWorkIntervalModel
+                {
+                    startedAt = intervalStartedAt.ToString("O"),
+                    endedAt = end.ToString("O"),
+                    workedSeconds = intervalWorkedSeconds
+                });
+            intervalStartedAt = default;
+            intervalWorkedSeconds = 0;
+        }
+
+        private void RecordInterruptedFocus()
+        {
+            if (activeSessionId == null || progressService == null) return;
+            CloseFocusInterval();
+            double worked = 0;
+            foreach (var interval in focusIntervals) worked += interval.workedSeconds;
+            if (worked >= 1)
+            {
+                var end = DateTimeOffset.Now;
+                progressService.RecordFocusSession(new CompletedFocusBlockModel
+                {
+                    sessionId = activeSessionId,
+                    sessionDate = end.LocalDateTime.ToString("yyyy-MM-dd"),
+                    startedAt = activeFocusStartedAt.ToString("O"),
+                    completedAt = end.ToString("O"),
+                    taskId = activeSessionTask?.id ?? string.Empty,
+                    taskTitle = activeSessionTask?.title ?? "Sin tarea asignada",
+                    workedSeconds = (int)Math.Floor(worked),
+                    plannedSeconds = timer.FocusDurationSeconds,
+                    recordingVersion = 1,
+                    interrupted = true,
+                    workIntervals = new List<FocusWorkIntervalModel>(focusIntervals)
+                });
+            }
+            activeSessionId = null;
+            activeSessionTask = null;
+            activeFocusStartedAt = default;
+            focusIntervals.Clear();
         }
 
         private void OnCycleCompletedPlaybackRequested()

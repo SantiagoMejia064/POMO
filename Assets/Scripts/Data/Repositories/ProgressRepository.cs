@@ -70,6 +70,65 @@ namespace Pomo.Data.Repositories
             return storedProgress.trophyAwards.AsReadOnly();
         }
 
+        public IReadOnlyList<CompletedFocusBlockModel> GetRecordedStudySessions()
+        {
+            Reload();
+            var sessions = new List<CompletedFocusBlockModel>();
+            foreach (var day in storedProgress.dailyProgress)
+            {
+                if (day == null) continue;
+                sessions.AddRange(day.completedBlocks);
+                sessions.AddRange(day.interruptedBlocks);
+            }
+            sessions.AddRange(storedProgress.rhythmDemoSessions);
+            return sessions.AsReadOnly();
+        }
+
+        public bool HasRhythmDemoSessions()
+        {
+            Reload();
+            return storedProgress.rhythmDemoSessions.Count > 0;
+        }
+
+#if UNITY_EDITOR
+        public void SetRhythmDemoSessions(List<CompletedFocusBlockModel> sessions, bool onlyIfUninitialized = false)
+        {
+            Reload();
+            if (onlyIfUninitialized && storedProgress.rhythmDemoInitialized) return;
+            storedProgress.rhythmDemoInitialized = true;
+            storedProgress.rhythmDemoSessions = sessions ?? new List<CompletedFocusBlockModel>();
+            Save();
+        }
+#endif
+
+        public bool TryRecordFocusSession(CompletedFocusBlockModel session, out DailyProgressModel day)
+        {
+            day = null;
+            if (session == null || string.IsNullOrWhiteSpace(session.sessionId) || session.workedSeconds <= 0)
+                return false;
+
+            Reload();
+            foreach (var existing in storedProgress.dailyProgress)
+            {
+                if (existing == null) continue;
+                if (existing.completedBlocks.Exists(s => s != null && s.sessionId == session.sessionId) ||
+                    existing.interruptedBlocks.Exists(s => s != null && s.sessionId == session.sessionId))
+                    return false;
+            }
+
+            day = GetOrCreate(session.sessionDate);
+            if (session.interrupted)
+                day.interruptedBlocks.Add(session);
+            else
+            {
+                day.completedBlocks.Add(session);
+                day.completedFocusBlocks++;
+                day.workedSeconds += session.workedSeconds;
+            }
+            Save();
+            return true;
+        }
+
         public int GetTotalTrophies()
         {
             Reload();
@@ -165,6 +224,7 @@ namespace Pomo.Data.Repositories
 
             storedProgress.dailyProgress ??= new List<DailyProgressModel>();
             storedProgress.trophyAwards ??= new List<TrophyAwardModel>();
+            storedProgress.rhythmDemoSessions ??= new List<CompletedFocusBlockModel>();
             storedProgress.cupsBalance = Math.Max(0, storedProgress.cupsBalance);
 
             foreach (DailyProgressModel progress in storedProgress.dailyProgress)
@@ -172,6 +232,7 @@ namespace Pomo.Data.Repositories
                 if (progress != null)
                 {
                     progress.completedBlocks ??= new List<CompletedFocusBlockModel>();
+                    progress.interruptedBlocks ??= new List<CompletedFocusBlockModel>();
                 }
             }
         }
