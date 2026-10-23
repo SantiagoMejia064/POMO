@@ -1,5 +1,4 @@
 using System;
-using System.Text;
 using Pomo.Business.Progress;
 using Pomo.Data.Models;
 using Pomo.Data.Repositories;
@@ -25,7 +24,6 @@ namespace Pomo.Presentation.Screens
     {
         [Header("Análisis configurable")]
         [Range(1, 24)] public int slotHours = 2;
-        [Range(1, 90)] public int analysisDays = 7;
         [Min(1)] public int minimumSessions = 3;
         [Min(1)] public int minimumActiveDays = 2;
         [Header("Referencias guardadas")]
@@ -70,6 +68,7 @@ namespace Pomo.Presentation.Screens
         private void OnEnable()
         {
             FitToCanvas();
+            ApplyChartTypography();
             if (!Application.isPlaying) return;
 #if UNITY_EDITOR
             if (initializeDemoDataInEditor) WorkRhythmDemoData.Load(true);
@@ -104,11 +103,11 @@ namespace Pomo.Presentation.Screens
         public void Refresh()
         {
             slotHours = Mathf.Clamp(slotHours, 1, 24);
-            analysisDays = Mathf.Clamp(analysisDays, 1, 90);
             service ??= new WorkRhythmService();
-            current = service.GetRhythm(DateTimeOffset.Now, slotHours, analysisDays, minimumSessions, minimumActiveDays);
+            current = service.GetRhythm(DateTimeOffset.Now, slotHours, minimumSessions, minimumActiveDays);
+            ApplyChartTypography();
             lastRefreshDate = DateTime.Today;
-            periodText.text = $"{current.fromDate:dd/MM}–{current.toDate:dd/MM} · franjas de {slotHours} h";
+            periodText.text = "Tu ritmo general";
             summaryText.text = $"{current.workedSeconds / 60d:0.#} min · {current.sessionCount} sesiones";
             detailsText.text = current.sessionCount == 0 ? "Tus hábitos aparecerán al registrar bloques." :
                 $"Sesiones: {current.shortestSessionSeconds / 60d:0.#}–{current.longestSessionSeconds / 60d:0.#} min · " +
@@ -116,14 +115,7 @@ namespace Pomo.Presentation.Screens
             if (current.unlocatedSessions > 0)
                 detailsText.text += $"\n{current.unlocatedSessions} registros sin intervalos fiables no se distribuyen en la gráfica.";
             trendText.text = current.trendMessage;
-            var days = new StringBuilder();
-            if (current.days.Count > 7) days.Append("Últimos 7 días del periodo: ");
-            for (int i = Math.Max(0, current.days.Count - 7); i < current.days.Count; i++)
-            {
-                var day = current.days[i];
-                days.Append($"{day.date:dd/MM}: {day.workedSeconds / 60d:0.#} min   ");
-            }
-            daysText.text = days.ToString();
+            daysText.text = $"Todo tu historial · franjas de {slotHours} h";
             emptyState.SetActive(current.sessionCount == 0);
             createReminderButton.interactable = reminderFlow != null;
             RenderGuide();
@@ -145,17 +137,46 @@ namespace Pomo.Presentation.Screens
                 rect.anchorMax = new Vector2((i + 1) * width, 1);
                 rect.offsetMin = new Vector2(3, 0);
                 rect.offsetMax = new Vector2(-3, 0);
-                // Labels remain readable with 24 hourly slots on smaller displays.
-                bars[i].label.fontSize = current.slots.Count > 12 ? 34 : 50;
-                bars[i].value.fontSize = current.slots.Count > 12 ? 32 : 46;
-                bars[i].label.text = $"{slot.startHour:00}h";
-                bars[i].value.text = $"{slot.Minutes:0}\n{slot.sessionCount} b";
+                // Units are in the legend: each column contains minutes, blocks, then its start hour.
+                bars[i].label.text = $"{slot.startHour:00}";
+                bars[i].value.text = $"{slot.Minutes:0}\n{slot.sessionCount}";
                 bars[i].fill.anchorMax = new Vector2(1, max > 0 ? (float)(slot.workedSeconds / max) : 0);
                 float ratio = max > 0 ? (float)(slot.workedSeconds / max) : 0;
                 bars[i].image.color = slot.highestActivity ? peakColor :
                     Color.Lerp(activityColor, new Color(0f, .7f, .73f), ratio);
             }
             RecommendationChanged?.Invoke(current.recommendation);
+        }
+
+        public void ApplyChartTypography()
+        {
+            if (bars == null) return;
+            bool hourly = slotHours == 1;
+            foreach (var bar in bars)
+            {
+                if (bar == null || bar.label == null || bar.value == null || bar.fill == null) continue;
+                ConfigureChartText(bar.label, hourly ? 28 : 42, hourly ? 24 : 36, 0, .15f);
+                ConfigureChartText(bar.value, hourly ? 28 : 42, hourly ? 16 : 24, .17f, .49f);
+                var track = (RectTransform)bar.fill.parent;
+                track.anchorMin = new Vector2(.12f, .52f);
+                track.anchorMax = new Vector2(.88f, .97f);
+                track.offsetMin = track.offsetMax = Vector2.zero;
+            }
+        }
+
+        private static void ConfigureChartText(TMP_Text text, float size, float minimum, float bottom, float top)
+        {
+            text.fontSize = size;
+            text.enableAutoSizing = true;
+            text.fontSizeMin = minimum;
+            text.fontSizeMax = size;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
+            text.alignment = TextAlignmentOptions.Center;
+            text.margin = Vector4.zero;
+            text.lineSpacing = 0;
+            text.rectTransform.anchorMin = new Vector2(0, bottom);
+            text.rectTransform.anchorMax = new Vector2(1, top);
+            text.rectTransform.offsetMin = text.rectTransform.offsetMax = Vector2.zero;
         }
 
         public void SkipIntroduction()

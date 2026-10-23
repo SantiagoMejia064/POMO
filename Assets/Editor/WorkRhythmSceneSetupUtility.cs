@@ -61,7 +61,7 @@ namespace Pomo.EditorTools
                 var header = Panel("Cabecera", root, .0f, .91f, 1, .98f, Blue);
                 Text("Título", header, .04f, 0, .96f, 1, "RITMO DE TRABAJO", 45, Color.white);
                 controller.periodText = Text("Periodo", root, .05f, .87f, .95f, .91f,
-                    "Últimos 7 días · franjas de 2 h", 27, Ink);
+                    "Tu ritmo general", 27, Ink);
                 controller.summaryText = Text("Resumen", root, .05f, .83f, .95f, .87f,
                     "0 min · 0 sesiones · 0 días con actividad", 29, Ink);
 
@@ -94,7 +94,7 @@ namespace Pomo.EditorTools
                 controller.daysText = Text("Actividad por día", root, .05f, .405f, .95f, .45f,
                     "Actividad por día: todavía sin registros.", 22, Ink);
                 controller.trendText = Text("Tendencia", root, .05f, .34f, .95f, .405f,
-                    "Aún no hay periodos para comparar.", 24, Ink);
+                    "Tu ritmo reúne toda tu actividad registrada y se actualiza con cada bloque.", 24, Ink);
 
                 var introduction = Panel("Recomendaciones", root, .05f, .17f, .95f, .335f, Color.white);
                 controller.introduction = introduction.gameObject;
@@ -165,21 +165,18 @@ namespace Pomo.EditorTools
             SetBounds(root.Find("Cabecera/Título"), .22f, 0, .98f, 1);
             SetBounds(view.periodText.transform, .05f, .835f, .95f, .88f);
             view.periodText.fontSize = 50;
+            view.periodText.text = "Tu ritmo general";
             SetBounds(view.summaryText.transform, .05f, .79f, .95f, .835f);
             view.summaryText.fontSize = 54;
             var chart = root.Find("Gráfica de actividad");
             SetBounds(chart, .04f, .525f, .96f, .785f);
             chart.GetComponent<Image>().color = new Color(.61f, .75f, .88f, .65f);
             var legend = chart.Find("Leyenda").GetComponent<TMP_Text>();
-            legend.text = "Minutos · verde: mayor actividad";
+            legend.text = "Minutos / bloques · hora (24 h)";
             legend.fontSize = 44;
             SetBounds(view.graph, .02f, .015f, .98f, .86f);
             foreach (var bar in view.bars)
             {
-                bar.label.fontSize = 50;
-                bar.value.fontSize = 46;
-                SetBounds(bar.label.transform, -.05f, 0, 1.05f, .17f);
-                SetBounds(bar.value.transform, -.05f, .17f, 1.05f, .45f);
                 var track = bar.fill.parent;
                 SetBounds(track, .12f, .46f, .88f, .97f);
                 track.GetComponent<Image>().color = new Color(.30f, .47f, .67f, .15f);
@@ -237,7 +234,21 @@ namespace Pomo.EditorTools
             root.GetComponent<Image>().color = new Color32(151, 185, 219, 255);
             view.createReminderButton.gameObject.SetActive(true);
             RhythmReminderSceneBuilder.Attach(view);
-            view.layoutVersion = 4;
+            ApplyChartLayout(view);
+            EditorUtility.SetDirty(view);
+        }
+
+        internal static void ApplyChartLayout(WorkRhythmScreenController view)
+        {
+            view.ApplyChartTypography();
+            var legend = view.graph.parent.Find("Leyenda").GetComponent<TMP_Text>();
+            legend.text = "Minutos / bloques · hora (24 h)";
+            for (int i = 0; i < view.bars.Length; i++)
+            {
+                view.bars[i].label.text = $"{i * view.slotHours:00}";
+                view.bars[i].value.text = "0\n0";
+            }
+            view.layoutVersion = 5;
             EditorUtility.SetDirty(view);
         }
 

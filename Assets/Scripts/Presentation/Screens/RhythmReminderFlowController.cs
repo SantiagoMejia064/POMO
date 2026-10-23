@@ -174,7 +174,7 @@ namespace Pomo.Presentation.Screens
         private void RenderHours()
         {
             var analysis = new WorkRhythmService().GetRhythm(DateTimeOffset.Now, rhythm.slotHours,
-                rhythm.analysisDays, rhythm.minimumSessions, rhythm.minimumActiveDays);
+                rhythm.minimumSessions, rhythm.minimumActiveDays);
             double max = 0;
             foreach (var slot in analysis.slots) if (slot.sessionCount >= 2) max = Math.Max(max, slot.workedSeconds);
             int first = analysis.slots.FindIndex(s => s.startHour >= 6);

@@ -16,28 +16,27 @@ namespace Pomo.Business.Progress
             this.progress = progress ?? new ProgressService();
         }
 
-        // Calendar days in the device's local zone, including today up to 'now'.
-        public WorkRhythmModel GetRhythm(DateTimeOffset now, int slotHours = 2, int analysisDays = 7,
+        // Accumulate every stored session up to now, grouped by the device's local hour.
+        public WorkRhythmModel GetRhythm(DateTimeOffset now, int slotHours = 2,
             int minimumSessions = 3, int minimumActiveDays = 2)
         {
             slotHours = Math.Max(1, Math.Min(24, slotHours));
-            analysisDays = Math.Max(1, Math.Min(90, analysisDays));
-            DateTime start = now.LocalDateTime.Date.AddDays(1 - analysisDays);
-            DateTime previousStart = start.AddDays(-analysisDays);
             var all = progress.GetRecordedStudySessions();
-            var currentSessions = new List<CompletedFocusBlockModel>();
-            var previousSessions = new List<CompletedFocusBlockModel>();
-            var result = Analyze(all, start, now.LocalDateTime, slotHours, currentSessions, true);
-            var previous = Analyze(all, previousStart, start, slotHours, previousSessions);
-
-            // Reuse existing progress metrics/feedback for completed sessions only.
-            result.comparison = progress.CompareSessions(previousSessions, currentSessions);
-            result.feedback = progress.GetPerformanceFeedback(result.comparison);
-            double changeMinutes = (result.workedSeconds - previous.workedSeconds) / 60d;
-            result.trendMessage = previous.sessionCount == 0
-                ? "Aún no hay actividad horaria comparable en el periodo anterior."
-                : $"Frente a los {analysisDays} días anteriores: {changeMinutes:+0.#;-0.#;0} min de actividad registrada. " +
-                  "El periodo actual incluye el día de hoy en curso.";
+            DateTime start = now.LocalDateTime.Date;
+            foreach (var session in all)
+            {
+                if (session == null || session.workedSeconds <= 0) continue;
+                if (DateUtils.TryParseStoredDate(session.startedAt, out DateTimeOffset began) &&
+                    began.LocalDateTime.Date < start) start = began.LocalDateTime.Date;
+                if (TrySessionDay(session, out DateTime day) && day < start) start = day;
+                if (session.workIntervals == null) continue;
+                foreach (var interval in session.workIntervals)
+                    if (interval != null && interval.workedSeconds > 0 &&
+                        DateUtils.TryParseStoredDate(interval.startedAt, out DateTimeOffset at) &&
+                        at.LocalDateTime.Date < start) start = at.LocalDateTime.Date;
+            }
+            var result = Analyze(all, start, now.LocalDateTime, slotHours);
+            result.trendMessage = "Tu ritmo reúne toda tu actividad registrada y se actualiza con cada bloque.";
 
             WorkRhythmSlot best = null;
             foreach (var slot in result.slots)
@@ -52,7 +51,7 @@ namespace Pomo.Business.Progress
                 endHour = best?.endHour ?? 0,
                 message = enough
                     ? $"Tu horario con más actividad registrada es de {best.Label} " +
-                      $"({best.Minutes:0.#} min). Puedes planificar una tarea en esa franja. " +
+                      $"({best.Minutes:0.#} min). Puedes crear un recordatorio en esa franja. " +
                       "Es un hábito observado, no una medida de energía o eficiencia."
                     : $"Estamos recopilando datos. Para sugerir un horario necesitamos al menos " +
                       $"{Math.Max(1, minimumSessions)} sesiones con horarios fiables en " +
@@ -62,16 +61,13 @@ namespace Pomo.Business.Progress
         }
 
         private static WorkRhythmModel Analyze(IReadOnlyList<CompletedFocusBlockModel> sessions,
-            DateTime from, DateTime until, int hours, List<CompletedFocusBlockModel> completed, bool includeToday = false)
+            DateTime from, DateTime until, int hours)
         {
             var result = new WorkRhythmModel { fromDate = from.Date, toDate = until.Date };
             for (int hour = 0; hour < 24; hour += hours)
                 result.slots.Add(new WorkRhythmSlot { startHour = hour, endHour = Math.Min(24, hour + hours) });
-            // Exclude the midnight endpoint from the previous period's day list.
-            DateTime lastDay = !includeToday && until.TimeOfDay == TimeSpan.Zero && until > from
-                ? until.AddTicks(-1).Date : until.Date;
-            for (DateTime day = from.Date; day <= lastDay; day = day.AddDays(1))
-                result.days.Add(new WorkRhythmDay { date = day });
+            // Keep only active days; long histories do not allocate one entry for every empty day.
+            var dayIndices = new Dictionary<DateTime, int>();
 
             var ids = new HashSet<string>();
             foreach (var session in sessions)
@@ -93,7 +89,7 @@ namespace Pomo.Business.Progress
                         // Reject overlapping/corrupt intervals; never count a session twice.
                         if (lastEnd.HasValue && begin < lastEnd.Value) continue;
                         double seconds = Math.Min(budget, Math.Min(interval.workedSeconds, (end - begin).TotalSeconds));
-                        allocated += Allocate(result, begin, end, seconds, from, until, hours, touchedSlots, touchedDays);
+                        allocated += Allocate(result, begin, end, seconds, from, until, hours, touchedSlots, touchedDays, dayIndices);
                         budget -= seconds;
                         lastEnd = end;
                         if (budget <= 0) break;
@@ -106,7 +102,7 @@ namespace Pomo.Business.Progress
                     // Old records with pauses cannot be distributed truthfully. Only continuous
                     // historical blocks whose wall duration matches work duration are located.
                     allocated = Allocate(result, begin, end, session.workedSeconds,
-                        from, until, hours, touchedSlots, touchedDays);
+                        from, until, hours, touchedSlots, touchedDays, dayIndices);
                 }
 
                 if (allocated <= 0)
@@ -117,7 +113,6 @@ namespace Pomo.Business.Progress
                 }
                 result.sessionCount++;
                 if (session.interrupted) result.interruptedSessions++;
-                else completed.Add(session);
                 result.workedSeconds += allocated;
                 result.longestSessionSeconds = Math.Max(result.longestSessionSeconds, session.workedSeconds);
                 result.shortestSessionSeconds = result.shortestSessionSeconds == 0 ? session.workedSeconds :
@@ -133,7 +128,8 @@ namespace Pomo.Business.Progress
         }
 
         private static double Allocate(WorkRhythmModel result, DateTimeOffset begin, DateTimeOffset end,
-            double seconds, DateTime from, DateTime until, int hours, HashSet<int> touchedSlots, HashSet<int> touchedDays)
+            double seconds, DateTime from, DateTime until, int hours, HashSet<int> touchedSlots, HashSet<int> touchedDays,
+            Dictionary<DateTime, int> dayIndices)
         {
             if (seconds <= 0) return 0;
             // Walk UTC instants; local calendar boundaries follow the device time zone,
@@ -156,12 +152,14 @@ namespace Pomo.Business.Progress
                     double amount = (next - cursor).TotalSeconds * rate;
                     result.slots[index].workedSeconds += amount;
                     touchedSlots.Add(index);
-                    int dayIndex = (local.Date - from.Date).Days;
-                    if (dayIndex >= 0 && dayIndex < result.days.Count)
+                    if (!dayIndices.TryGetValue(local.Date, out int dayIndex))
                     {
-                        result.days[dayIndex].workedSeconds += amount;
-                        touchedDays.Add(dayIndex);
+                        dayIndex = result.days.Count;
+                        dayIndices.Add(local.Date, dayIndex);
+                        result.days.Add(new WorkRhythmDay { date = local.Date });
                     }
+                    result.days[dayIndex].workedSeconds += amount;
+                    touchedDays.Add(dayIndex);
                     total += amount;
                 }
                 cursor = next;

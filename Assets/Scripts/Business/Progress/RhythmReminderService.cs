@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Pomo.Data.Models;
 using Pomo.Data.Repositories;
 using Pomo.ServicesAdapters.Notifications;
@@ -87,6 +88,21 @@ namespace Pomo.Business.Progress
                     reminder.notificationState = "enviada";
                     repository.Save(reminder);
                 }
+        }
+
+        /// <summary>Reads existing reminders without rescheduling notifications or creating tasks.</summary>
+        public IReadOnlyList<RhythmReminderModel> GetCalendarReminders()
+        {
+            var result = repository.GetAll().FindAll(reminder => reminder != null &&
+                reminder.notificationState != "cancelada" && !string.IsNullOrWhiteSpace(reminder.name) &&
+                DateUtils.TryParseStoredDate(reminder.scheduledAt, out _));
+            result.Sort((first, second) =>
+            {
+                DateUtils.TryParseStoredDate(first.scheduledAt, out DateTimeOffset firstAt);
+                DateUtils.TryParseStoredDate(second.scheduledAt, out DateTimeOffset secondAt);
+                return firstAt.CompareTo(secondAt);
+            });
+            return result;
         }
 
         public void Cancel(string id)

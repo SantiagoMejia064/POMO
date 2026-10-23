@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using Pomo.Business.Tasks;
+using Pomo.Business.Progress;
 using Pomo.Data.Models;
 using Pomo.Shared.Enums;
 using Pomo.Shared.Utilities;
@@ -15,9 +16,7 @@ using UnityEditor.SceneManagement;
 namespace Pomo.Presentation.Screens
 {
     /// <summary>
-    /// Builds the task calendar inside the Calendar section. It reads the same
-    /// task repository used by task creation/editing, so dates and deletions do
-    /// not need a second persistence mechanism.
+    /// Displays tasks and independent reminders from their existing stores in Mi horario.
     /// </summary>
     [DisallowMultipleComponent]
     [ExecuteAlways]
@@ -32,6 +31,7 @@ namespace Pomo.Presentation.Screens
 
         [Header("Visual")]
         [SerializeField] private TMP_FontAsset calendarFont;
+        [SerializeField] private TMP_FontAsset reminderFont;
 
         [Header("Integración")]
         [SerializeField] private TasksScreenController tasksScreenController;
@@ -45,6 +45,8 @@ namespace Pomo.Presentation.Screens
         private static readonly Color SelectedColor = Hex("#F04B45");
 
         private TaskService taskService;
+        private RhythmReminderService reminderService;
+        private IReadOnlyList<RhythmReminderModel> calendarReminders = Array.Empty<RhythmReminderModel>();
         private readonly List<GameObject> dateCells = new List<GameObject>();
 
         private RectTransform calendarRoot;
@@ -56,6 +58,9 @@ namespace Pomo.Presentation.Screens
         private DateTime displayedDate;
         private CalendarMode mode = CalendarMode.Month;
         private bool wasCalendarVisible;
+        private Transform reminderPanel;
+        private int reminderIndex;
+        private string pendingDeleteId;
 
         private void Awake()
         {
@@ -106,6 +111,7 @@ namespace Pomo.Presentation.Screens
         private void OnDisable()
         {
             wasCalendarVisible = false;
+            CloseReminderDetails();
         }
 
         private void Update()
@@ -124,7 +130,7 @@ namespace Pomo.Presentation.Screens
             wasCalendarVisible = isCalendarVisible;
         }
 
-        /// <summary>Refresh after another screen creates, edits, or deletes a task.</summary>
+        /// <summary>Reload tasks and reminders when entering Mi horario or changing the visible period.</summary>
         public void RefreshCalendar()
         {
             if (gridRoot == null || !Application.isPlaying || taskService == null)
@@ -133,13 +139,17 @@ namespace Pomo.Presentation.Screens
             }
 
             taskService.ReloadStoredTasks();
+            if (reminderService == null) reminderService = new RhythmReminderService();
+            calendarReminders = reminderService.GetCalendarReminders();
             UpdateHeader();
             RebuildDateGrid();
             UpdateSelectedDayDetails();
+            RenderReminderDetails();
         }
 
         public void ShowPreviousPeriod()
         {
+            CloseReminderDetails();
             displayedDate = mode == CalendarMode.Month
                 ? displayedDate.AddMonths(-1)
                 : mode == CalendarMode.Week
@@ -152,6 +162,7 @@ namespace Pomo.Presentation.Screens
 
         public void ShowNextPeriod()
         {
+            CloseReminderDetails();
             displayedDate = mode == CalendarMode.Month
                 ? displayedDate.AddMonths(1)
                 : mode == CalendarMode.Week
@@ -164,6 +175,7 @@ namespace Pomo.Presentation.Screens
 
         public void CycleCalendarMode()
         {
+            CloseReminderDetails();
             mode = (CalendarMode)(((int)mode + 1) % 3);
             displayedDate = selectedDate;
             RefreshCalendar();
@@ -186,6 +198,7 @@ namespace Pomo.Presentation.Screens
 
         public void ReturnToWorkMenu()
         {
+            CloseReminderDetails();
             if (calendarRoot == null)
             {
                 BindCalendarStructure();
@@ -242,6 +255,7 @@ namespace Pomo.Presentation.Screens
 
             BindCalendarStructure();
             bool changed = createdCalendar;
+            changed |= EnsureReminderControls();
             if (calendarRoot != null && calendarRoot.gameObject.activeSelf)
             {
                 calendarRoot.gameObject.SetActive(false);
@@ -371,6 +385,125 @@ namespace Pomo.Presentation.Screens
             selectedDayTasksLabel = selectedPanel != null
                 ? selectedPanel.Find("Selected Date Tasks")?.GetComponent<TMP_Text>()
                 : null;
+            reminderPanel = root.Find("Reminder Details");
+        }
+
+        private bool EnsureReminderControls()
+        {
+            if (calendarRoot == null || calendarRoot.Find("Reminder Details") != null) return false;
+#if UNITY_EDITOR
+            if (reminderFont == null)
+                reminderFont = UnityEditor.AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/Fuentes/Poppins-Regular SDF.asset");
+#endif
+            Transform selectedPanel = calendarRoot.Find("Selected Day Tasks");
+            if (selectedDayLabel != null)
+                Anchor(selectedDayLabel.rectTransform, new Vector2(.04f, .62f), new Vector2(.52f, .96f));
+            ReminderButton("Manage Reminders", "Recordatorios", selectedPanel,
+                new Vector2(.53f, .63f), new Vector2(.98f, .98f), 24, ShowSelectedDayReminders);
+            RectTransform panel = CreateRect("Reminder Details", calendarRoot);
+            Anchor(panel, new Vector2(.06f, .19f), new Vector2(.94f, .80f));
+            panel.gameObject.AddComponent<Image>().color = HeaderColor;
+            reminderPanel = panel;
+            ReminderText("Heading", panel, .05f, .89f, .95f, .98f, "RECORDATORIOS", 64);
+            ReminderText("Date", panel, .05f, .81f, .95f, .89f, "", 46);
+            ReminderText("Count", panel, .22f, .72f, .78f, .81f, "", 46);
+            ReminderText("Name", panel, .06f, .39f, .94f, .71f, "", 64);
+            ReminderText("Notice", panel, .06f, .25f, .94f, .39f, "", 44);
+            ReminderButton("Previous Reminder", "<", panel, new Vector2(.04f, .72f), new Vector2(.20f, .81f), 48, PreviousReminder);
+            ReminderButton("Next Reminder", ">", panel, new Vector2(.80f, .72f), new Vector2(.96f, .81f), 48, NextReminder);
+            ReminderButton("Delete Reminder", "Borrar recordatorio", panel, new Vector2(.08f, .15f), new Vector2(.92f, .24f), 48, RequestDeleteReminder);
+            ReminderButton("Confirm Delete", "Eliminar", panel, new Vector2(.05f, .15f), new Vector2(.48f, .24f), 48, ConfirmDeleteReminder);
+            ReminderButton("Keep Reminder", "Conservar", panel, new Vector2(.52f, .15f), new Vector2(.95f, .24f), 48, KeepReminder);
+            ReminderButton("Close Reminders", "Volver al calendario", panel, new Vector2(.08f, .03f), new Vector2(.92f, .12f), 48, CloseReminderDetails);
+            panel.Find("Confirm Delete").gameObject.SetActive(false);
+            panel.Find("Keep Reminder").gameObject.SetActive(false);
+            panel.gameObject.SetActive(false);
+            return true;
+        }
+
+        private TMP_Text ReminderText(string name, Transform parent, float x0, float y0, float x1, float y1, string value, float size)
+        {
+            TMP_Text text = CreateText(name, parent, new Vector2(x0, y0), new Vector2(x1, y1), value, size, Color.white, TextAlignmentOptions.Center);
+            if (reminderFont != null) text.font = reminderFont;
+            text.richText = false;
+            return text;
+        }
+
+        private void ReminderButton(string name, string label, Transform parent, Vector2 min, Vector2 max, float size, UnityEngine.Events.UnityAction action)
+        {
+            Button button = CreateButton(name, label, parent, min, max, CalendarColor, size, action);
+            if (reminderFont != null) button.GetComponentInChildren<TMP_Text>().font = reminderFont;
+        }
+
+        public void ShowSelectedDayReminders()
+        {
+            if (!Application.isPlaying || reminderPanel == null) return;
+            pendingDeleteId = null;
+            reminderIndex = 0;
+            reminderPanel.gameObject.SetActive(true);
+            gridRoot.gameObject.SetActive(false);
+            RenderReminderDetails();
+        }
+
+        public void CloseReminderDetails()
+        {
+            pendingDeleteId = null;
+            if (reminderPanel != null) reminderPanel.gameObject.SetActive(false);
+            if (gridRoot != null) gridRoot.gameObject.SetActive(true);
+        }
+
+        public void PreviousReminder() { reminderIndex--; pendingDeleteId = null; RenderReminderDetails(); }
+        public void NextReminder() { reminderIndex++; pendingDeleteId = null; RenderReminderDetails(); }
+        public void KeepReminder() { pendingDeleteId = null; RenderReminderDetails(); }
+
+        public void RequestDeleteReminder()
+        {
+            var reminders = FindRemindersForDate(selectedDate);
+            if (reminderIndex < 0 || reminderIndex >= reminders.Count) return;
+            pendingDeleteId = reminders[reminderIndex].id;
+            RenderReminderDetails();
+        }
+
+        public void ConfirmDeleteReminder()
+        {
+            if (string.IsNullOrEmpty(pendingDeleteId) || reminderService == null) return;
+            try
+            {
+                reminderService.Cancel(pendingDeleteId);
+                pendingDeleteId = null;
+                RefreshCalendar();
+                reminderPanel.Find("Notice").GetComponent<TMP_Text>().text = "Recordatorio eliminado.";
+            }
+            catch (Exception)
+            {
+                reminderPanel.Find("Notice").GetComponent<TMP_Text>().text = "No se pudo eliminar. Inténtalo de nuevo.";
+            }
+        }
+
+        private void RenderReminderDetails()
+        {
+            if (reminderPanel == null) return;
+            var reminders = FindRemindersForDate(selectedDate);
+            Button manage = calendarRoot.Find("Selected Day Tasks/Manage Reminders")?.GetComponent<Button>();
+            if (manage != null) manage.interactable = reminders.Count > 0;
+            if (!reminderPanel.gameObject.activeSelf) return;
+            reminderIndex = Math.Max(0, Math.Min(reminderIndex, reminders.Count - 1));
+            if (!string.IsNullOrEmpty(pendingDeleteId))
+            {
+                int pendingIndex = reminders.FindIndex(reminder => reminder.id == pendingDeleteId);
+                if (pendingIndex < 0) pendingDeleteId = null;
+                else reminderIndex = pendingIndex;
+            }
+            bool confirming = !string.IsNullOrEmpty(pendingDeleteId);
+            reminderPanel.Find("Date").GetComponent<TMP_Text>().text = selectedDate.ToString("dd MMMM yyyy", new CultureInfo("es-CO"));
+            reminderPanel.Find("Count").GetComponent<TMP_Text>().text = reminders.Count == 0 ? "Sin recordatorios" : $"{reminderIndex + 1} de {reminders.Count}";
+            reminderPanel.Find("Name").GetComponent<TMP_Text>().text = reminders.Count == 0 ? "No hay recordatorios para este día." : reminders[reminderIndex].name;
+            reminderPanel.Find("Notice").GetComponent<TMP_Text>().text = confirming ? "¿Eliminar este recordatorio y cancelar su notificación?" : "";
+            reminderPanel.Find("Previous Reminder").GetComponent<Button>().interactable = !confirming && reminderIndex > 0;
+            reminderPanel.Find("Next Reminder").GetComponent<Button>().interactable = !confirming && reminderIndex + 1 < reminders.Count;
+            reminderPanel.Find("Delete Reminder").gameObject.SetActive(!confirming && reminders.Count > 0);
+            reminderPanel.Find("Confirm Delete").gameObject.SetActive(confirming);
+            reminderPanel.Find("Keep Reminder").gameObject.SetActive(confirming);
         }
 
         private void BuildEditorPreview()
@@ -388,6 +521,7 @@ namespace Pomo.Presentation.Screens
 
             BindCalendarStructure();
             WireRuntimeButtons();
+            calendarReminders = Array.Empty<RhythmReminderModel>();
             RebuildDateGrid(Array.Empty<TaskModel>());
             UpdateHeader();
             UpdateSelectedDayDetails(Array.Empty<TaskModel>());
@@ -541,8 +675,10 @@ namespace Pomo.Presentation.Screens
                 TextAlignmentOptions.TopLeft);
 
             List<TaskModel> dayTasks = FindTasksForDate(tasks, date);
+            List<RhythmReminderModel> dayReminders = FindRemindersForDate(date);
             int visibleTaskCount = mode == CalendarMode.Day ? 4 : 2;
-            int displayedCount = Math.Min(dayTasks.Count, visibleTaskCount);
+            // Reserve a row so reminders stay visible even on days that already have tasks.
+            int displayedCount = Math.Min(dayTasks.Count, visibleTaskCount - (dayReminders.Count > 0 ? 1 : 0));
             for (int taskIndex = 0; taskIndex < displayedCount; taskIndex++)
             {
                 float rowHeight = mode == CalendarMode.Day ? 0.16f : 0.25f;
@@ -561,13 +697,44 @@ namespace Pomo.Presentation.Screens
                     Color.white, TextAlignmentOptions.MidlineLeft);
             }
 
-            if (dayTasks.Count > displayedCount)
+            int displayedReminders = Math.Min(dayReminders.Count, visibleTaskCount - displayedCount);
+            for (int i = 0; i < displayedReminders; i++)
             {
                 float rowHeight = mode == CalendarMode.Day ? 0.16f : 0.25f;
-                float taskTop = 0.74f - displayedCount * rowHeight;
+                float reminderTop = 0.74f - (displayedCount + i) * rowHeight;
+                RectTransform reminderRect = CreateRect("Reminder " + dayReminders[i].id, cell);
+                Anchor(reminderRect, new Vector2(0.05f, reminderTop - rowHeight + 0.025f),
+                    new Vector2(0.95f, reminderTop));
+                Image reminderImage = reminderRect.gameObject.AddComponent<Image>();
+                reminderImage.color = Hex("#247B83");
+                Button reminderButton = reminderRect.gameObject.AddComponent<Button>();
+                reminderButton.targetGraphic = reminderImage;
+                string reminderId = dayReminders[i].id;
+                reminderButton.onClick.AddListener(() =>
+                {
+                    SelectDate(date);
+                    ShowSelectedDayReminders();
+                    reminderIndex = FindRemindersForDate(date).FindIndex(reminder => reminder.id == reminderId);
+                    RenderReminderDetails();
+                });
+                TMP_Text reminderLabel = CreateText("Reminder Name", reminderRect,
+                    new Vector2(0.06f, 0.05f), new Vector2(0.94f, 0.95f),
+                    dayReminders[i].name, mode == CalendarMode.Day ? 14 : 10,
+                    Color.white, TextAlignmentOptions.MidlineLeft);
+                reminderLabel.textWrappingMode = TextWrappingModes.NoWrap;
+                reminderLabel.richText = false;
+                reminderLabel.overflowMode = TextOverflowModes.Ellipsis;
+            }
+
+            int totalCount = dayTasks.Count + dayReminders.Count;
+            int shownCount = displayedCount + displayedReminders;
+            if (totalCount > shownCount)
+            {
+                float rowHeight = mode == CalendarMode.Day ? 0.16f : 0.25f;
+                float taskTop = 0.74f - shownCount * rowHeight;
                 CreateText("More Tasks", cell,
                     new Vector2(0.06f, taskTop - rowHeight), new Vector2(0.94f, taskTop),
-                    "+" + (dayTasks.Count - displayedCount) + " más", 10, Color.white,
+                    "+" + (totalCount - shownCount) + " más", 10, Color.white,
                     TextAlignmentOptions.MidlineLeft);
             }
         }
@@ -626,10 +793,12 @@ namespace Pomo.Presentation.Screens
             }
 
             selectedDayLabel.text = selectedDate.ToString("dddd, dd MMMM", new CultureInfo("es-CO"));
+            selectedDayTasksLabel.richText = false;
             List<TaskModel> dayTasks = FindTasksForDate(tasks, selectedDate);
-            if (dayTasks.Count == 0)
+            List<RhythmReminderModel> dayReminders = FindRemindersForDate(selectedDate);
+            if (dayTasks.Count == 0 && dayReminders.Count == 0)
             {
-                selectedDayTasksLabel.text = "No tienes tareas para este día.";
+                selectedDayTasksLabel.text = "No tienes tareas ni recordatorios para este día.";
                 return;
             }
 
@@ -647,7 +816,22 @@ namespace Pomo.Presentation.Screens
                 }
             }
 
+            foreach (var reminder in dayReminders)
+            {
+                if (taskLines.Length > 0) taskLines += "\n";
+                taskLines += "• " + reminder.name;
+            }
             selectedDayTasksLabel.text = taskLines;
+        }
+
+        private List<RhythmReminderModel> FindRemindersForDate(DateTime date)
+        {
+            var result = new List<RhythmReminderModel>();
+            foreach (var reminder in calendarReminders)
+                if (DateUtils.TryParseStoredDate(reminder.scheduledAt, out DateTimeOffset at) &&
+                    at.LocalDateTime.Date == date.Date)
+                    result.Add(reminder);
+            return result;
         }
 
         private void UpdateHeader()
@@ -673,6 +857,13 @@ namespace Pomo.Presentation.Screens
             BindButton("Calendar Header/Month", CycleCalendarMode);
             BindButton("Back To Work", ReturnToWorkMenu);
             BindButton("Add Task", ShowCreateTaskForm);
+            BindButton("Selected Day Tasks/Manage Reminders", ShowSelectedDayReminders);
+            BindButton("Reminder Details/Previous Reminder", PreviousReminder);
+            BindButton("Reminder Details/Next Reminder", NextReminder);
+            BindButton("Reminder Details/Delete Reminder", RequestDeleteReminder);
+            BindButton("Reminder Details/Confirm Delete", ConfirmDeleteReminder);
+            BindButton("Reminder Details/Keep Reminder", KeepReminder);
+            BindButton("Reminder Details/Close Reminders", CloseReminderDetails);
         }
 
         private void BindButton(string relativePath, UnityEngine.Events.UnityAction callback)

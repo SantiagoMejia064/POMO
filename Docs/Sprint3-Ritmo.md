@@ -67,3 +67,42 @@ Salir de Play, recargar Steven 1 y esperar a que compile. Si la escena tenía ca
 8. Aceptar confirmación: regresar al inicio. Comprobar también Omitir y reentrada para POMO-244.
 
 POMO-234/POMO-235 quedan corregidas en código e interfaz al flujo independiente de recordatorio, según esta nueva definición. Las demás implementaciones de H5 se conservan. POMO-244 y la aceptación visual/Android siguen pendientes de verificación interactiva; no cerrar tareas solo por la compilación. No se modificaron estados en Jira ni se crearon pruebas automatizadas nuevas.
+
+
+## 23/10/2026 — Recordatorios en Mi horario y etiquetas de la gráfica
+
+Mi horario consulta `rhythm-reminders.json` mediante RhythmReminderService al abrir el calendario y al cambiar de periodo. Los recordatorios existentes aparecen por su nombre en la fecha local programada, en las vistas mes, semana y día. Se excluyen registros cancelados, sin nombre o con fecha inválida; los recordatorios pasados se conservan visibles. No se duplican registros ni se convierten en tareas, y esta lectura no programa notificaciones.
+
+Cuando un día tiene tareas y recordatorios, se reserva al menos una fila para mostrar un recordatorio. Los nombres largos se abrevian visualmente en la celda; al seleccionar el día se muestra el nombre completo en el detalle junto a las tareas. El indicador «+N más» cuenta ambos tipos.
+
+La gráfica usa filas separadas para minutos, bloques y hora inicial en formato de 24 horas. Las unidades están en la leyenda; los números no permiten saltos automáticos de línea. Poppins mantiene tamaño máximo 42 con ajuste automático limitado al espacio de cada columna. Los cambios están serializados en Steven 1 y la migración 5 solo ajusta la gráfica cuando la escena ya tiene el flujo de recordatorios.
+
+Validación técnica: compilación C# de ejecución para Editor y rama Android, compilación del ensamblado Editor, revisión de referencias de escena y espacio de etiquetas con métricas de Poppins. Sin pruebas automatizadas nuevas. La comprobación visual e interactiva en Play/dispositivo queda por realizar; compilar no confirma esa aceptación.
+
+Comprobación manual:
+1. Crear un recordatorio desde Ritmo, aceptar y abrir Trabajo > Mi horario.
+2. Ir a su fecha: comprobar su nombre; seleccionarla para ver el nombre completo. Comprobar también un recordatorio creado antes de este cambio y reabrir la aplicación.
+3. Verificar mes/semana/día y una fecha que también tenga tareas. Las tareas siguen abriendo su resumen habitual.
+4. Abrir Ritmo con los datos de prueba: comprobar números como 255 y 300, cantidad de bloques y horas sin cortes ni superposiciones.
+
+POMO-244 ya fue validada y cerrada por Santiago. No se modificaron estados en Jira en esta corrección.
+
+
+## 23/10/2026 — Ritmo general de todo el historial
+
+Se reemplazó la ventana de siete días por el acumulado de todas las sesiones guardadas hasta el momento actual. Las barras suman minutos efectivos de todo el uso por franja horaria; los mínimos de sesiones y días para recomendar se evalúan sobre ese historial. El selector de horas de Crear recordatorio consulta el mismo análisis acumulado.
+
+La interfaz muestra «Tu ritmo general», sin rango de fechas ni comparación entre periodos. Se conserva el registro detallado original: no se borran sesiones ni se modifican sus fechas, pausas o tareas. Los registros antiguos sin intervalos fiables siguen sin asignarse artificialmente a una hora. Los días activos se acumulan en una lista dispersa para evitar crear filas por cada día vacío de años de historial.
+
+Validación manual pendiente: comprobar que una sesión de hace más de siete y de noventa días contribuye a su franja, crear un bloque nuevo y verificar actualización acumulada; comprobar que las horas sugeridas en recordatorios siguen ese mismo historial y que no aparece ninguna fecha en la pantalla de Ritmo.
+
+
+## 23/10/2026 — Borrar recordatorios desde Mi horario
+
+En Mi horario se puede pulsar un recordatorio o seleccionar el día y abrir «Recordatorios». Se muestra su nombre completo y se puede recorrer todos los recordatorios de ese día con las flechas, incluidos los que no caben en la celda del mes. «Borrar recordatorio» pide confirmar con «Eliminar» o permite «Conservar». El panel y sus controles están guardados como GameObjects editables en Steven 1.
+
+Se reutiliza RhythmReminderService.Cancel: cancela la notificación programada y la mostrada de ese ID en Android, guarda el estado cancelada en rhythm-reminders.json y excluye el recordatorio de Mi horario tras refrescar. El registro cancelado se conserva internamente; no reaparece al reiniciar. Si falla la cancelación o la persistencia, se muestra el error sin confirmar una eliminación exitosa. No se modifican las tareas.
+
+Validación técnica: compilación C# para Editor y rama Android, referencias/jerarquía de los controles serializados y diff sin errores de formato. Queda comprobar interactivamente abrir, Conservar, Eliminar, eliminar el último del día, navegar varios recordatorios y reiniciar; en Android verificar también que el aviso eliminado no se entregue.
+
+Consulta Jira de cierre (solo lectura): H5 tiene 20 tareas POMO-225 a POMO-244. Ya figuran finalizadas 225, 226, 227, 228, 230, 231, 238, 242, 243 y 244. Con lo implementado y la validación del flujo comunicada por Santiago, son candidatas a cerrar 229, 232, 233, 235, 237, 239 y 240. Para 234 y 236 falta confirmar si se probó la notificación real en Android; para 241, confirmar el escenario de nuevos bloques que cambian recomendaciones conservando los recordatorios existentes. No se cambiaron estados ni responsables en Jira. La eliminación nueva todavía necesita su comprobación manual.

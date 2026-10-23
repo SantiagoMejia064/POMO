@@ -28,9 +28,10 @@ namespace Pomo.EditorTools
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             foreach (var view in UnityEngine.Object.FindObjectsByType<WorkRhythmScreenController>(FindObjectsInactive.Include, FindObjectsSortMode.None))
             {
-                if (view.gameObject.scene.path != "Assets/Scenes/Steven 1.unity" || view.layoutVersion >= 4) continue;
+                if (view.gameObject.scene.path != "Assets/Scenes/Steven 1.unity" || view.layoutVersion >= 5) continue;
                 bool alreadyDirty = view.gameObject.scene.isDirty;
-                WorkRhythmSceneSetupUtility.ApplyStoryboardLayout(view);
+                if (view.layoutVersion < 4) WorkRhythmSceneSetupUtility.ApplyStoryboardLayout(view);
+                else WorkRhythmSceneSetupUtility.ApplyChartLayout(view);
                 UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(view.gameObject.scene);
                 if (!alreadyDirty) UnityEditor.SceneManagement.EditorSceneManager.SaveScene(view.gameObject.scene);
                 else Debug.Log("Ritmo actualizado en la escena abierta. Guarda Steven 1 para conservar también tus cambios anteriores.");
