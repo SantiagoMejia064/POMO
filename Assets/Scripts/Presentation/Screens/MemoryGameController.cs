@@ -25,14 +25,21 @@ namespace Pomo.Presentation.Screens
         [SerializeField] private TMP_Text statusText;
         [SerializeField] private TMP_Text pairsText;
         [SerializeField] private TMP_Text attemptsText;
-        [SerializeField] private TMP_Text scoreText;
+        [Header("Puntaje por dígitos")]
+        [SerializeField] private TMP_Text scoreThousandsText;
+        [SerializeField] private TMP_Text scoreHundredsText;
+        [SerializeField] private TMP_Text scoreTensText;
+        [SerializeField] private TMP_Text scoreUnitsText;
         [SerializeField] private TMP_Text timerText;
         [SerializeField] private Button pauseButton;
         [SerializeField] private TMP_Text pauseButtonLabel;
         [SerializeField] private GameObject resultPanel;
         [SerializeField] private TMP_Text resultText;
         [SerializeField] private Button soundToggleButton;
-        [SerializeField] private TMP_Text soundToggleLabel;
+
+        [Header("Sprites del botón de sonido")]
+        [SerializeField] private Sprite soundOnSprite;
+        [SerializeField] private Sprite soundOffSprite;
         [SerializeField] private GridLayoutGroup cardGrid;
         [SerializeField] private MemoryCardView[] cards;
         [SerializeField] private Sprite[] figureSprites;
@@ -312,10 +319,7 @@ namespace Pomo.Presentation.Screens
                 attemptsText.text = $"INTENTOS  {game.Attempts}";
             }
 
-            if (scoreText != null)
-            {
-                scoreText.text = $"PUNTOS  {game.Score}";
-            }
+            RefreshScoreDigits();
 
             if (resultPanel != null)
             {
@@ -337,6 +341,28 @@ namespace Pomo.Presentation.Screens
             }
 
             RefreshTimerView();
+        }
+
+        private void RefreshScoreDigits()
+        {
+            if (game == null)
+                return;
+
+            // Mantiene cuatro dígitos y rellena con ceros a la izquierda.
+            int score = Mathf.Max(0, game.Score) % 10000;
+            string digits = score.ToString("D4");
+
+            if (scoreThousandsText != null)
+                scoreThousandsText.text = digits[0].ToString();
+
+            if (scoreHundredsText != null)
+                scoreHundredsText.text = digits[1].ToString();
+
+            if (scoreTensText != null)
+                scoreTensText.text = digits[2].ToString();
+
+            if (scoreUnitsText != null)
+                scoreUnitsText.text = digits[3].ToString();
         }
 
         private void RefreshTimerView()
@@ -412,16 +438,12 @@ namespace Pomo.Presentation.Screens
             }
 
             bool enabled = audioService.IsEnabled;
-            if (soundToggleLabel != null)
-            {
-                soundToggleLabel.text = enabled ? "SONIDO ON" : "SONIDO OFF";
-            }
 
-            if (soundToggleButton != null && soundToggleButton.targetGraphic is Image image)
+            if (soundToggleButton != null &&
+                soundToggleButton.targetGraphic is Image image)
             {
-                image.color = enabled
-                    ? new Color32(61, 108, 167, 255)
-                    : new Color32(106, 112, 124, 255);
+                image.sprite = enabled ? soundOnSprite : soundOffSprite;
+                image.color = new Color32(27, 79, 144, 255);
             }
         }
 
