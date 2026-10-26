@@ -307,6 +307,7 @@ namespace Pomo.Presentation.Screens
                     game.IsMatched(index),
                     game.CanSelect(index),
                     sprite);
+                new Color32(239, 209, 156, 255);
             }
 
             if (pairsText != null)
