@@ -1,4 +1,3 @@
-
 using System;
 using Pomo.Business.Minigames;
 using Pomo.Business.Pomodoro;
@@ -12,6 +11,8 @@ namespace Pomo.Presentation.Screens
     [DisallowMultipleComponent]
     public sealed class MemoryGameController : MonoBehaviour
     {
+        private const string AUDIO_ENABLED_KEY = "Pomo_AudioEnabled";
+
         [Header("Navegación")]
         [SerializeField] private GameObject homePanel;
         [SerializeField] private Button closeButton;
@@ -38,14 +39,13 @@ namespace Pomo.Presentation.Screens
         [SerializeField] private TMP_Text resultText;
 
         [Header("Expresiones de Pomo")]
-        [SerializeField] private RawImage pomoImage;
-        [SerializeField] private Texture pomoInicial;
-        [SerializeField] private Texture pomoJugando;
-        [SerializeField] private Texture pomoError;
-        [SerializeField] private Texture pomoAcierto;
-        [SerializeField] private Texture pomoRondaCompletada;
-        [SerializeField] private Texture pomoNuevaRonda;
-        [SerializeField] private Texture pomoPartidaTerminada;
+        [SerializeField] private RawImage pomoInicial;
+        [SerializeField] private RawImage pomoJugando;
+        [SerializeField] private RawImage pomoError;
+        [SerializeField] private RawImage pomoAcierto;
+        [SerializeField] private RawImage pomoRondaCompletada;
+        [SerializeField] private RawImage pomoNuevaRonda;
+        [SerializeField] private RawImage pomoPartidaTerminada;
 
         [Header("Sonido")]
         [SerializeField] private Button soundToggleButton;
@@ -86,28 +86,44 @@ namespace Pomo.Presentation.Screens
             if (cards == null || cards.Length < 2 || cards.Length % 2 != 0)
             {
                 Debug.LogError(
-                    "Memoria necesita una cantidad par de cartas asignadas.", this);
+                    "Memoria necesita una cantidad par de cartas asignadas.",
+                    this
+                );
+
                 enabled = false;
                 return;
             }
 
-            for (int i = 0; i < cards.Length; i++)
+            for (int index = 0; index < cards.Length; index++)
             {
-                if (cards[i] == null)
+                if (cards[index] == null)
                 {
-                    Debug.LogError($"Falta la carta {i + 1} en Memoria.", this);
+                    Debug.LogError(
+                        $"Falta la carta {index + 1} en Memoria.",
+                        this
+                    );
+
                     enabled = false;
                     return;
                 }
 
-                cards[i].Bind(i, SelectCard);
+                cards[index].Bind(index, SelectCard);
             }
 
             game = new MemoryMatchGame(cards.Length / 2);
+
             gameTimer = new PomodoroTimer();
             gameTimer.WorkCompleted += EndAtTimeLimit;
 
             audioService = new AudioService();
+
+            // Recuperar el estado de sonido guardado.
+            // Por defecto, el sonido está activado la primera vez.
+            bool audioGuardado =
+                PlayerPrefs.GetInt(AUDIO_ENABLED_KEY, 1) == 1;
+
+            audioService.SetEnabled(audioGuardado);
+
             audioService.CuePlaybackRequested += PlaySoundCue;
 
             startButton?.onClick.AddListener(StartNewGame);
@@ -125,10 +141,19 @@ namespace Pomo.Presentation.Screens
 
             game.Reset();
             gameTimer.Reset();
-            gameTimer.ConfigureSeconds(
-                Mathf.Max(1, gameDurationSeconds), 0);
 
             roundTransitionRemainingSeconds = 0f;
+
+            gameTimer.ConfigureSeconds(
+                Mathf.Max(1, gameDurationSeconds),
+                0
+            );
+
+            if (startButton != null)
+                startButton.gameObject.SetActive(true);
+
+            if (pauseButton != null)
+                pauseButton.gameObject.SetActive(false);
 
             if (pausePanel != null)
                 pausePanel.SetActive(false);
@@ -144,6 +169,8 @@ namespace Pomo.Presentation.Screens
 
             Canvas.ForceUpdateCanvases();
             LayoutCards();
+
+            RefreshSoundToggle();
             StartContinuousSound();
         }
 
@@ -154,10 +181,10 @@ namespace Pomo.Presentation.Screens
 
             roundTransitionRemainingSeconds = 0f;
 
+            soundEffectAudioSource?.Stop();
+
             if (pausePanel != null)
                 pausePanel.SetActive(false);
-
-            soundEffectAudioSource?.Stop();
         }
 
         private void OnDestroy()
@@ -185,7 +212,6 @@ namespace Pomo.Presentation.Screens
             if (game == null)
                 return;
 
-            // No avanzar durante la pausa o antes de empezar.
             if (game.Phase == MemoryGamePhase.Paused ||
                 game.Phase == MemoryGamePhase.Idle ||
                 game.Phase == MemoryGamePhase.TimedOut)
@@ -194,6 +220,9 @@ namespace Pomo.Presentation.Screens
             }
 
             gameTimer.Advance(Time.deltaTime);
+
+            if (game.Phase == MemoryGamePhase.TimedOut)
+                return;
 
             if (game.Phase == MemoryGamePhase.Completed)
             {
@@ -205,6 +234,7 @@ namespace Pomo.Presentation.Screens
                     CambiarImagenPomo(pomoNuevaRonda);
 
                     SetStatus("Nueva ronda: memoriza las cartas.");
+
                     RefreshView();
                 }
                 else
@@ -235,17 +265,28 @@ namespace Pomo.Presentation.Screens
             if (game == null)
                 return;
 
+            soundEffectAudioSource?.Stop();
+
             game.StartNewGame(
-                NewSeed(), previewSeconds, mismatchSeconds);
+                NewSeed(),
+                previewSeconds,
+                mismatchSeconds
+            );
 
             roundTransitionRemainingSeconds = 0f;
 
             gameTimer.ConfigureSeconds(
-                Mathf.Max(1, gameDurationSeconds), 0);
+                Mathf.Max(1, gameDurationSeconds),
+                0
+            );
 
             gameTimer.Start();
 
-            CambiarImagenPomo(pomoJugando);
+            if (startButton != null)
+                startButton.gameObject.SetActive(false);
+
+            if (pauseButton != null)
+                pauseButton.gameObject.SetActive(true);
 
             if (pausePanel != null)
                 pausePanel.SetActive(false);
@@ -253,7 +294,11 @@ namespace Pomo.Presentation.Screens
             if (resultPanel != null)
                 resultPanel.SetActive(false);
 
+            CambiarImagenPomo(pomoJugando);
+
             SetStatus("Memoriza las cartas antes de que se oculten.");
+
+            StartContinuousSound();
             RefreshView();
         }
 
@@ -268,27 +313,36 @@ namespace Pomo.Presentation.Screens
                 {
                     gameTimer.Resume();
 
+                    if (audioService != null &&
+                        audioService.IsEnabled)
+                    {
+                        soundEffectAudioSource?.UnPause();
+                    }
+
                     if (pausePanel != null)
                         pausePanel.SetActive(false);
 
                     SetStatus(
                         game.Phase == MemoryGamePhase.Preview
                             ? "Memoriza las cartas antes de que se oculten."
-                            : "Selecciona dos cartas para encontrar un par."
+                            : game.Phase == MemoryGamePhase.Completed
+                                ? "Nuevo tablero en unos instantes."
+                                : "Selecciona dos cartas para encontrar un par."
                     );
                 }
             }
-            else
+            else if (game.Pause())
             {
-                if (game.Pause())
-                {
-                    gameTimer.Pause();
+                gameTimer.Pause();
 
-                    if (pausePanel != null)
-                        pausePanel.SetActive(true);
+                soundEffectAudioSource?.Pause();
 
-                    SetStatus("Partida en pausa.");
-                }
+                if (pausePanel != null)
+                    pausePanel.SetActive(true);
+
+                SetStatus(
+                    "Partida en pausa. Pulsa CONTINUAR para volver."
+                );
             }
 
             RefreshView();
@@ -299,23 +353,27 @@ namespace Pomo.Presentation.Screens
             if (!game.EndByTimeLimit())
                 return;
 
-            SetStatus($"Tiempo agotado. Puntaje final: {game.Score} puntos.");
-
             CambiarImagenPomo(pomoPartidaTerminada);
 
             if (pausePanel != null)
                 pausePanel.SetActive(false);
 
+            SetStatus(
+                $"Tiempo agotado. Puntaje final: {game.Score} puntos."
+            );
+
             audioService?.RequestCuePlayback(SoundCue.MemoryTimeUp);
 
             RefreshView();
 
-            FinalResultReady?.Invoke(new MemoryGameResult(
-                game.Score,
-                game.TotalResolvedPairs,
-                game.Attempts,
-                game.RoundsCompleted
-            ));
+            FinalResultReady?.Invoke(
+                new MemoryGameResult(
+                    game.Score,
+                    game.TotalResolvedPairs,
+                    game.Attempts,
+                    game.RoundsCompleted
+                )
+            );
         }
 
         public void CloseGame()
@@ -348,16 +406,20 @@ namespace Pomo.Presentation.Screens
                     CambiarImagenPomo(pomoAcierto);
 
                     audioService?.RequestCuePlayback(
-                        SoundCue.MemoryMatch);
+                        SoundCue.MemoryMatch
+                    );
                     break;
 
                 case MemorySelectionResult.Mismatch:
-                    SetStatus("No coinciden. Memoriza sus posiciones.");
+                    SetStatus(
+                        "No coinciden. Memoriza sus posiciones."
+                    );
 
                     CambiarImagenPomo(pomoError);
 
                     audioService?.RequestCuePlayback(
-                        SoundCue.MemoryMismatch);
+                        SoundCue.MemoryMismatch
+                    );
                     break;
 
                 case MemorySelectionResult.GameCompleted:
@@ -365,12 +427,14 @@ namespace Pomo.Presentation.Screens
                         roundTransitionSeconds;
 
                     SetStatus(
-                        $"¡Ronda {game.RoundsCompleted} completa! Sigue jugando.");
+                        $"¡Ronda {game.RoundsCompleted} completa! Sigue jugando."
+                    );
 
                     CambiarImagenPomo(pomoRondaCompletada);
 
                     audioService?.RequestCuePlayback(
-                        SoundCue.MemoryRoundCompleted);
+                        SoundCue.MemoryRoundCompleted
+                    );
                     break;
             }
 
@@ -383,21 +447,22 @@ namespace Pomo.Presentation.Screens
             if (game == null)
                 return;
 
-            for (int i = 0; i < cards.Length; i++)
+            for (int index = 0; index < cards.Length; index++)
             {
-                int pairId = game.GetPairId(i);
+                int pairId = game.GetPairId(index);
 
                 Sprite sprite =
                     figureSprites != null &&
+                    pairId >= 0 &&
                     pairId < figureSprites.Length
                         ? figureSprites[pairId]
                         : null;
 
-                cards[i].SetVisual(
+                cards[index].SetVisual(
                     pairId,
-                    game.IsFaceUp(i),
-                    game.IsMatched(i),
-                    game.CanSelect(i),
+                    game.IsFaceUp(index),
+                    game.IsMatched(index),
+                    game.CanSelect(index),
                     sprite
                 );
             }
@@ -417,7 +482,8 @@ namespace Pomo.Presentation.Screens
             if (resultPanel != null)
             {
                 resultPanel.SetActive(
-                    game.Phase == MemoryGamePhase.TimedOut);
+                    game.Phase == MemoryGamePhase.TimedOut
+                );
             }
 
             if (resultText != null &&
@@ -428,6 +494,21 @@ namespace Pomo.Presentation.Screens
                     $"{game.TotalResolvedPairs} PARES  |  " +
                     $"{game.Attempts} INTENTOS\n" +
                     GetMotivationalMessage();
+            }
+
+            if (startButtonLabel != null)
+            {
+                startButtonLabel.text =
+                    game.Phase == MemoryGamePhase.Idle
+                        ? "EMPEZAR"
+                        : "REINICIAR";
+            }
+
+            if (pausePanel != null)
+            {
+                pausePanel.SetActive(
+                    game.Phase == MemoryGamePhase.Paused
+                );
             }
 
             RefreshTimerView();
@@ -460,79 +541,97 @@ namespace Pomo.Presentation.Screens
             {
                 int remaining = gameTimer == null
                     ? Mathf.Max(1, gameDurationSeconds)
-                    : Mathf.CeilToInt(gameTimer.RemainingSeconds);
+                    : Mathf.CeilToInt(
+                        gameTimer.RemainingSeconds
+                    );
 
                 timerText.text =
                     $"{remaining / 60:00}:{remaining % 60:00}";
             }
 
-            bool isIdle = game == null ||
-                          game.Phase == MemoryGamePhase.Idle;
-
-            bool isPaused = game != null &&
-                            game.Phase == MemoryGamePhase.Paused;
-
-            bool isFinished = game != null &&
-                              game.Phase == MemoryGamePhase.TimedOut;
-
-            if (startButton != null)
-                startButton.gameObject.SetActive(isIdle || isFinished);
-
-            if (startButtonLabel != null)
-            {
-                startButtonLabel.text = isFinished
-                    ? "JUGAR DE NUEVO"
-                    : "EMPEZAR";
-            }
-
             if (pauseButton != null)
             {
-                pauseButton.gameObject.SetActive(
-                    !isIdle && !isFinished);
+                bool showPauseButton =
+                    game != null &&
+                    game.Phase != MemoryGamePhase.Idle &&
+                    game.Phase != MemoryGamePhase.TimedOut;
+
+                pauseButton.gameObject.SetActive(showPauseButton);
 
                 pauseButton.interactable =
                     game != null &&
-                    (game.Phase == MemoryGamePhase.Preview ||
-                     game.Phase == MemoryGamePhase.Ready ||
-                     game.Phase == MemoryGamePhase.ResolvingMismatch ||
-                     game.Phase == MemoryGamePhase.Completed ||
-                     game.Phase == MemoryGamePhase.Paused);
+                    (
+                        game.Phase == MemoryGamePhase.Preview ||
+                        game.Phase == MemoryGamePhase.Ready ||
+                        game.Phase == MemoryGamePhase.ResolvingMismatch ||
+                        game.Phase == MemoryGamePhase.Completed ||
+                        game.Phase == MemoryGamePhase.Paused
+                    );
             }
 
             if (pauseButtonLabel != null)
             {
-                pauseButtonLabel.text = isPaused
-                    ? ""
-                    : "";
+                pauseButtonLabel.text =
+                    game != null &&
+                    game.Phase == MemoryGamePhase.Paused
+                        ? "CONTINUAR"
+                        : "PAUSAR";
             }
 
             if (pauseButton != null &&
                 pauseButton.targetGraphic is Image pauseImage)
             {
-                pauseImage.sprite = isPaused
-                    ? playSprite
-                    : pauseSprite;
+                pauseImage.sprite =
+                    game != null &&
+                    game.Phase == MemoryGamePhase.Paused
+                        ? playSprite
+                        : pauseSprite;
             }
-
-            if (pausePanel != null)
-                pausePanel.SetActive(isPaused);
 
             RefreshSoundToggle();
         }
 
-        private void CambiarImagenPomo(Texture imagen)
+        private void CambiarImagenPomo(RawImage imagenActiva)
         {
-            if (pomoImage != null && imagen != null)
-                pomoImage.texture = imagen;
+            if (pomoInicial != null)
+                pomoInicial.gameObject.SetActive(imagenActiva == pomoInicial);
+
+            if (pomoJugando != null)
+                pomoJugando.gameObject.SetActive(imagenActiva == pomoJugando);
+
+            if (pomoError != null)
+                pomoError.gameObject.SetActive(imagenActiva == pomoError);
+
+            if (pomoAcierto != null)
+                pomoAcierto.gameObject.SetActive(imagenActiva == pomoAcierto);
+
+            if (pomoRondaCompletada != null)
+                pomoRondaCompletada.gameObject.SetActive(
+                    imagenActiva == pomoRondaCompletada
+                );
+
+            if (pomoNuevaRonda != null)
+                pomoNuevaRonda.gameObject.SetActive(
+                    imagenActiva == pomoNuevaRonda
+                );
+
+            if (pomoPartidaTerminada != null)
+                pomoPartidaTerminada.gameObject.SetActive(
+                    imagenActiva == pomoPartidaTerminada
+                );
         }
 
         private int NewSeed(bool nextRound = false)
         {
             return useFixedSeedForDebug
-                ? unchecked(fixedSeed +
-                    (nextRound ? game.RoundsCompleted * 7919 : 0))
-                : unchecked(Environment.TickCount ^
-                    Guid.NewGuid().GetHashCode());
+                ? unchecked(
+                    fixedSeed +
+                    (nextRound ? game.RoundsCompleted * 7919 : 0)
+                )
+                : unchecked(
+                    Environment.TickCount ^
+                    Guid.NewGuid().GetHashCode()
+                );
         }
 
         private string GetMotivationalMessage()
@@ -555,15 +654,25 @@ namespace Pomo.Presentation.Screens
             if (audioService == null)
                 return;
 
-            audioService.SetEnabled(!audioService.IsEnabled);
+            bool nuevoEstado = !audioService.IsEnabled;
 
-            if (audioService.IsEnabled)
+            audioService.SetEnabled(nuevoEstado);
+
+            // Guardar el estado para futuras entradas y sesiones.
+            PlayerPrefs.SetInt(
+                AUDIO_ENABLED_KEY,
+                nuevoEstado ? 1 : 0
+            );
+
+            PlayerPrefs.Save();
+
+            if (!nuevoEstado)
             {
-                StartContinuousSound();
+                soundEffectAudioSource?.Stop();
             }
             else
             {
-                soundEffectAudioSource?.Stop();
+                StartContinuousSound();
             }
 
             RefreshSoundToggle();
@@ -574,10 +683,12 @@ namespace Pomo.Presentation.Screens
             if (audioService == null)
                 return;
 
+            bool soundEnabled = audioService.IsEnabled;
+
             if (soundToggleButton != null &&
                 soundToggleButton.targetGraphic is Image image)
             {
-                image.sprite = audioService.IsEnabled
+                image.sprite = soundEnabled
                     ? soundOnSprite
                     : soundOffSprite;
 
@@ -587,12 +698,8 @@ namespace Pomo.Presentation.Screens
 
         private void PlaySoundCue(SoundCue cue)
         {
-            if (audioService == null ||
-                !audioService.IsEnabled ||
-                soundEffectAudioSource == null)
-            {
+            if (audioService == null || !audioService.IsEnabled)
                 return;
-            }
 
             AudioClip clip = null;
 
@@ -615,15 +722,19 @@ namespace Pomo.Presentation.Screens
                     break;
             }
 
-            if (clip != null)
+            if (soundEffectAudioSource != null && clip != null)
+            {
                 soundEffectAudioSource.PlayOneShot(clip);
+            }
         }
 
         private void StartContinuousSound()
         {
+            if (audioService == null || !audioService.IsEnabled)
+                return;
+
             if (soundEffectAudioSource == null ||
-                audioService == null ||
-                !audioService.IsEnabled)
+                soundEffectAudioSource.clip == null)
             {
                 return;
             }
@@ -636,22 +747,31 @@ namespace Pomo.Presentation.Screens
 
         private void LayoutCards()
         {
-            if (cardGrid == null || cards == null || cards.Length == 0)
+            if (cardGrid == null ||
+                cards == null ||
+                cards.Length == 0)
+            {
                 return;
+            }
 
-            Rect rect = ((RectTransform)cardGrid.transform).rect;
+            Rect rect =
+                ((RectTransform)cardGrid.transform).rect;
 
             if (rect.width <= 0f || rect.height <= 0f)
                 return;
 
             const int columns = 4;
-            int rows = (cards.Length + columns - 1) / columns;
+
+            int rows =
+                (cards.Length + columns - 1) / columns;
 
             float width =
-                (rect.width - cardGrid.spacing.x * (columns - 1)) / columns;
+                (rect.width -
+                 cardGrid.spacing.x * (columns - 1)) / columns;
 
             float height =
-                (rect.height - cardGrid.spacing.y * (rows - 1)) / rows;
+                (rect.height -
+                 cardGrid.spacing.y * (rows - 1)) / rows;
 
             cardGrid.cellSize = new Vector2(
                 Mathf.Max(1f, width),
