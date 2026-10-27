@@ -16,6 +16,10 @@ namespace Pomo.Presentation.Screens
         [SerializeField] private Image cardBackground;
         [SerializeField] private TMP_Text faceLabel;
         [SerializeField] private Image figureImage;
+        [Header("Colores del prototipo")]
+        [SerializeField] private Color hiddenColor = new Color32(239, 209, 156, 255);
+        [SerializeField] private Color revealedColor = new Color32(255, 232, 185, 255);
+        [SerializeField] private Color matchedColor = new Color32(204, 225, 186, 255);
 
         private int cardIndex;
         private Action<int> onSelected;
@@ -56,10 +60,9 @@ namespace Pomo.Presentation.Screens
             if (cardBackground != null)
             {
                 cardBackground.color = isMatched
-                    ? new Color32(176, 218, 194, 255)
+                    ? matchedColor
                     : isFaceUp
-                        ? new Color32(234, 242, 250, 255)
-                        : new Color32(20, 59, 105, 255);
+                        ? revealedColor : hiddenColor;
             }
 
             bool showSprite = isFaceUp && figureSprite != null && figureImage != null;
@@ -71,8 +74,9 @@ namespace Pomo.Presentation.Screens
 
             if (faceLabel != null)
             {
-                faceLabel.gameObject.SetActive(!showSprite);
-                faceLabel.text = isFaceUp ? (pairId + 1).ToString() : "?";
+                // Las cartas ocultas son lisas, como en el prototipo.
+                faceLabel.gameObject.SetActive(isFaceUp && !showSprite);
+                faceLabel.text = isFaceUp ? (pairId + 1).ToString() : string.Empty;
                 faceLabel.color = isFaceUp
                     ? new Color32(20, 59, 105, 255)
                     : Color.white;

@@ -16,6 +16,7 @@ namespace Pomo.Presentation.Screens
         [SerializeField] private GameObject weeklyProgressPanel;
         [SerializeField] private GameObject weeklySummaryPanel;
         [SerializeField] private DailyProgressTextView dailyProgressView;
+        [SerializeField] private ProgressPomoFeedbackView weeklyPomoFeedback;
 
         public void OpenProgress()
         {
@@ -31,6 +32,7 @@ namespace Pomo.Presentation.Screens
         public void OpenWeeklyProgress()
         {
             SetPanelStates(true, false, false, true, false, false);
+            weeklyPomoFeedback?.Refresh();
         }
 
         public void OpenWeeklySummary()
@@ -45,6 +47,7 @@ namespace Pomo.Presentation.Screens
 
         public void ReturnToHome()
         {
+            weeklyPomoFeedback?.ClearComparison();
             SetPanelStates(false, false, false, false, false, true);
         }
 

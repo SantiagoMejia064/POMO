@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using Pomo.Business.Pomodoro;
 using Pomo.Data.Models;
@@ -38,10 +37,6 @@ namespace Pomo.Presentation.Screens
         [SerializeField] private GameObject timerPanel;
         [SerializeField] private GameObject saveBlockPanel;
 
-        [Header("Finalización de ciclo")]
-        [SerializeField] private GameObject homePanel;
-        [SerializeField, Min(1f)] private float completionMessageSeconds = 7f;
-
         [Header("Misión nueva")]
         [SerializeField] private Button createTaskFromBlockButton;
         [SerializeField] private TasksScreenController tasksScreenController;
@@ -60,7 +55,7 @@ namespace Pomo.Presentation.Screens
         private readonly List<BlockTaskSelectionItemView> taskItems = new List<BlockTaskSelectionItemView>();
         private readonly List<WorkBlockItemView> durationItems = new List<WorkBlockItemView>();
         private string defaultSelectionRequiredText;
-        private Coroutine returnHomeRoutine;
+        private bool hasStarted;
 
         private void Awake()
         {
@@ -75,22 +70,18 @@ namespace Pomo.Presentation.Screens
 
         private void Start()
         {
+            hasStarted = true;
             RefreshConfigurationLists();
             RefreshFavoriteBlocks();
             RefreshAddToFavoritesButtonLabel();
-
-            if (pomodoroController != null)
-            {
-                pomodoroController.RestCompleted += ReturnHomeAfterCompletion;
-            }
         }
 
-        private void OnDestroy()
+        private void OnEnable()
         {
-            if (pomodoroController != null)
-            {
-                pomodoroController.RestCompleted -= ReturnHomeAfterCompletion;
-            }
+            if (!hasStarted) return;
+            RefreshConfigurationLists();
+            RefreshFavoriteBlocks();
+            RefreshAddToFavoritesButtonLabel();
         }
 
         public void RefreshConfigurationLists()
@@ -139,6 +130,7 @@ namespace Pomo.Presentation.Screens
 
         public void ContinueToTimer()
         {
+            if (TryOpenCurrentSession()) return;
             if (pomodoroController == null || !pomodoroController.TryPrepareCustomBlock())
             {
                 ShowSelectionRequiredMessage(true);
@@ -356,6 +348,8 @@ namespace Pomo.Presentation.Screens
 
         private void SelectFavoriteAndOpenTimer(string blockId)
         {
+            // Viewing the current session is allowed; changing its selection is not.
+            if (TryOpenCurrentSession()) return;
             if (!CanChangeSessionSelection())
             {
                 return;
@@ -371,38 +365,23 @@ namespace Pomo.Presentation.Screens
             OpenTimerPanel();
         }
 
-        private void OpenTimerPanel()
+        public bool TryOpenCurrentSession()
         {
-            if (personalizeBlockPanel != null) personalizeBlockPanel.SetActive(false);
-            if (favoriteBlocksPanel != null) favoriteBlocksPanel.SetActive(false);
-            if (timerPanel != null) timerPanel.SetActive(true);
-            SetAddToFavoritesButtonVisible(true);
-            RefreshAddToFavoritesButtonLabel();
-            BlockPrepared?.Invoke();
+            if (pomodoroController == null || !pomodoroController.HasCurrentSession) return false;
+            ShowSelectionRequiredMessage(false);
+            OpenTimerPanel(false);
+            return true;
         }
 
-        private void ReturnHomeAfterCompletion()
+        private void OpenTimerPanel(bool wasPrepared = true)
         {
-            if (returnHomeRoutine != null)
-            {
-                StopCoroutine(returnHomeRoutine);
-            }
-
-            returnHomeRoutine = StartCoroutine(ReturnHomeAfterCompletionRoutine());
-        }
-
-        private IEnumerator ReturnHomeAfterCompletionRoutine()
-        {
-            yield return new WaitForSeconds(completionMessageSeconds);
-
-            if (timerPanel != null) timerPanel.SetActive(false);
             if (personalizeBlockPanel != null) personalizeBlockPanel.SetActive(false);
             if (favoriteBlocksPanel != null) favoriteBlocksPanel.SetActive(false);
             if (saveBlockPanel != null) saveBlockPanel.SetActive(false);
-            if (homePanel != null) homePanel.SetActive(true);
-
-            pomodoroController?.ResetTimer();
-            returnHomeRoutine = null;
+            if (timerPanel != null) timerPanel.SetActive(true);
+            SetAddToFavoritesButtonVisible(pomodoroController != null && pomodoroController.CanChangeSessionSelection);
+            RefreshAddToFavoritesButtonLabel();
+            if (wasPrepared) BlockPrepared?.Invoke();
         }
 
         private static void ClearContent(Transform content)

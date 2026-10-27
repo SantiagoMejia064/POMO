@@ -4,6 +4,7 @@ using System.Globalization;
 using Pomo.Data.Models;
 using Pomo.Data.Repositories;
 using Pomo.Business.Tasks;
+using Pomo.Business.Pomo;
 using Pomo.Shared.Enums;
 using Pomo.Shared.Utilities;
 
@@ -15,7 +16,7 @@ namespace Pomo.Business.Progress
     public class ProgressService
     {
         private readonly ProgressRepository progressRepository;
-        private readonly TaskService taskService;
+        private TaskService taskService;
 
         public const int MinimumTaskTrophyReward = 50;
         public const int MaximumTaskTrophyReward = 300;
@@ -25,23 +26,27 @@ namespace Pomo.Business.Progress
         public static event Action StudySessionsChanged;
 
         public ProgressService()
-            : this(new ProgressRepository(), new TaskService())
+            : this(new ProgressRepository())
         {
         }
 
         public ProgressService(ProgressRepository progressRepository)
-            : this(progressRepository, new TaskService())
         {
+            this.progressRepository = progressRepository ?? throw new ArgumentNullException(nameof(progressRepository));
         }
 
         public ProgressService(ProgressRepository progressRepository, TaskService taskService)
+            : this(progressRepository)
         {
-            this.progressRepository = progressRepository ?? throw new ArgumentNullException(nameof(progressRepository));
             this.taskService = taskService ?? throw new ArgumentNullException(nameof(taskService));
         }
 
         public TaskStatusCounts GetTaskStatusCounts()
         {
+            // Consultar desempeño no necesita cargar tareas. Su repositorio puede
+            // normalizar y guardar fechas históricas al construirse; diferir esa
+            // carga mantiene las consultas de comparación como solo lectura.
+            taskService ??= new TaskService();
             // The task screen owns a separate repository instance. Reload so a
             // count requested after a status change reflects the saved JSON.
             taskService.ReloadStoredTasks();
@@ -182,6 +187,9 @@ namespace Pomo.Business.Progress
         public DailyProgressModel RecordFocusSession(CompletedFocusBlockModel session)
         {
             if (!progressRepository.TryRecordFocusSession(session, out DailyProgressModel day)) return null;
+            // Solo el primer guardado de una sesión completada publica el logro.
+            // Las sesiones interrumpidas siguen actualizando las métricas existentes.
+            PomoReactionService.NotifyFocusBlockCompleted(session);
             StudySessionsChanged?.Invoke();
             return day;
         }

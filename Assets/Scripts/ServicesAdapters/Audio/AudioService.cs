@@ -7,7 +7,9 @@ namespace Pomo.ServicesAdapters.Audio
         MemoryMatch,
         MemoryMismatch,
         MemoryRoundCompleted,
-        MemoryTimeUp
+        MemoryTimeUp,
+        MemoryCardFlip,
+        MemoryButtonClick
     }
 
     /// <summary>

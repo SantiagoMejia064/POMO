@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Pomo.Business.Pomo;
 using Pomo.Data.Models;
 using Pomo.Data.Repositories;
 using Pomo.ServicesAdapters.Notifications;
@@ -193,6 +194,9 @@ namespace Pomo.Business.Tasks
 
         public TaskStatusTransitionResult TransitionStatus(string taskId, TaskStatus targetStatus)
         {
+            // Lista, detalle y actividad pueden usar instancias distintas. Leer el
+            // estado confirmado antes de decidir si existe una transición nueva.
+            taskRepository.Reload();
             TaskModel task = taskRepository.GetById(taskId);
 
             if (task == null)
@@ -220,6 +224,9 @@ namespace Pomo.Business.Tasks
             {
                 return TaskStatusTransitionResult.TaskNotFound;
             }
+
+            if (targetStatus == TaskStatus.Completed)
+                PomoReactionService.NotifyTaskCompleted(task.id, task.title, task.completedAt);
 
             if (targetStatus == TaskStatus.Completed && notificationService.CancelTaskReminder(task))
             {
