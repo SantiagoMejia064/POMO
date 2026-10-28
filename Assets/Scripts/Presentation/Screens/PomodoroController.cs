@@ -37,9 +37,9 @@ namespace Pomo.Presentation.Screens
         [SerializeField] private AudioClip cycleCompletionClip;
 
         [Header("Prueba temporal")]
-        [SerializeField] private bool useShortTestCycle;
-        [SerializeField, Min(1)] private int testFocusSeconds = 25;
-        [SerializeField, Min(0)] private int testRestSeconds = 5;
+        [SerializeField] private bool useShortTestCycle = true;
+        [SerializeField, Min(1)] private int testFocusSeconds = 10;
+        [SerializeField, Min(0)] private int testRestSeconds = 10;
 
         public float RemainingSeconds => timer?.RemainingSeconds ?? 0f;
         public int CurrentPhaseDurationSeconds => timer?.CurrentPhaseDurationSeconds ?? 0;

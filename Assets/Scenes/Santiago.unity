@@ -43227,9 +43227,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Pomo.Presentation.Screens.PomodoroController
   cycleCompletionAudioSource: {fileID: 130877918}
   cycleCompletionClip: {fileID: 8300000, guid: cea58a4cca0617e40a1ed25699193c5a, type: 3}
-  useShortTestCycle: 0
-  testFocusSeconds: 25
-  testRestSeconds: 5
+  useShortTestCycle: 1
+  testFocusSeconds: 10
+  testRestSeconds: 10
 --- !u!4 &807014043
 Transform:
   m_ObjectHideFlags: 0

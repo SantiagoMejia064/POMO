@@ -33,6 +33,7 @@ namespace Pomo.Presentation.Screens
         [SerializeField] private GameObject[] legacyFavoriteCards;
 
         [Header("Paneles existentes")]
+        [SerializeField] private GameObject workBlockLandingPanel;
         [SerializeField] private GameObject personalizeBlockPanel;
         [SerializeField] private GameObject favoriteBlocksPanel;
         [SerializeField] private GameObject timerPanel;
@@ -40,6 +41,9 @@ namespace Pomo.Presentation.Screens
 
         [Header("Finalización de ciclo")]
         [SerializeField] private GameObject homePanel;
+        [SerializeField] private GameObject completionContainer;
+        [SerializeField] private GameObject completionPanel;
+        [SerializeField] private GameObject completionFireRawImage;
         [SerializeField, Min(1f)] private float completionMessageSeconds = 7f;
 
         [Header("Misión nueva")]
@@ -97,6 +101,17 @@ namespace Pomo.Presentation.Screens
         {
             RefreshTaskList();
             RefreshDurationList();
+        }
+
+        /// <summary>Opens the initial panel of the work-block section from the selection menu.</summary>
+        public void OpenWorkBlockSection()
+        {
+            gameObject.SetActive(true);
+
+            if (completionContainer != null) completionContainer.SetActive(false);
+            if (completionPanel != null) completionPanel.SetActive(false);
+            if (timerPanel != null) timerPanel.SetActive(false);
+            if (workBlockLandingPanel != null) workBlockLandingPanel.SetActive(true);
         }
 
         public void RefreshFavoriteBlocks()
@@ -373,6 +388,8 @@ namespace Pomo.Presentation.Screens
 
         private void OpenTimerPanel()
         {
+            if (completionContainer != null) completionContainer.SetActive(false);
+            if (completionPanel != null) completionPanel.SetActive(false);
             if (personalizeBlockPanel != null) personalizeBlockPanel.SetActive(false);
             if (favoriteBlocksPanel != null) favoriteBlocksPanel.SetActive(false);
             if (timerPanel != null) timerPanel.SetActive(true);
@@ -383,6 +400,27 @@ namespace Pomo.Presentation.Screens
 
         private void ReturnHomeAfterCompletion()
         {
+            if (timerPanel != null)
+            {
+                timerPanel.SetActive(false);
+            }
+
+            if (completionContainer != null)
+            {
+                completionContainer.SetActive(true);
+            }
+
+            if (completionPanel != null)
+            {
+                completionPanel.SetActive(true);
+            }
+
+            // This reward is unlocked only after PomodoroTimer raises RestCompleted.
+            if (completionFireRawImage != null)
+            {
+                completionFireRawImage.SetActive(true);
+            }
+
             if (returnHomeRoutine != null)
             {
                 StopCoroutine(returnHomeRoutine);

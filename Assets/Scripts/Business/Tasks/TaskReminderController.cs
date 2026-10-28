@@ -108,7 +108,7 @@ public class TaskReminderController : MonoBehaviour
 
     private IEnumerator EsperarYMostrarNotificacion(
         string taskId,
-        string clave)
+        string clave)   
     {
         Debug.Log(
             "POMO: Esperando 5 segundos para mostrar notificación."
