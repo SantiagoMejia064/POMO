@@ -218,8 +218,8 @@ namespace Pomo.ServicesAdapters.Notifications
         public int NotifyBlockStarted(string taskTitle)
         {
             string notificationText = string.IsNullOrWhiteSpace(taskTitle)
-                ? "Tu bloque de enfoque ya comenzÃ³. Â¡Vamos paso a paso!"
-                : $"Comenzaste a trabajar en \"{taskTitle}\". Â¡Vamos paso a paso!";
+                ? "Tu bloque de enfoque ya comenzo. Vamos paso a paso!"
+                : $"Comenzaste a trabajar en \"{taskTitle}\". Vamos paso a paso!";
 
 #if UNITY_ANDROID
             EnsureCycleNotificationChannel();
