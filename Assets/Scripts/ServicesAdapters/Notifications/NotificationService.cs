@@ -24,6 +24,12 @@ namespace Pomo.ServicesAdapters.Notifications
         private const string CycleReminderChannelId = "pomo-cycle-reminders";
         private const string RhythmChannelId = "pomo-rhythm-reminders";
 
+        // These are the IDs configured in Edit > Project Settings > Mobile Notifications.
+        // Leave them empty until the POMO icons have been added there; Android then uses
+        // the application's default icon.
+        private const string PomoSmallIconId = "pomo_small";
+        private const string PomoLargeIconId = "pomo_large";
+
         public bool RhythmPermissionPending
         {
             get
@@ -200,6 +206,46 @@ namespace Pomo.ServicesAdapters.Notifications
             return NoNotificationId;
 #else
             Debug.Log($"POMO: recordatorio de descanso detectado: {notificationText}");
+            return NoNotificationId;
+#endif
+        }
+
+        /// <summary>
+        /// Shows a local Android notification when a focus block is started.
+        /// This is deliberately separate from NotifyBreakStarted so the two
+        /// messages are not confused or cancelled together.
+        /// </summary>
+        public int NotifyBlockStarted(string taskTitle)
+        {
+            string notificationText = string.IsNullOrWhiteSpace(taskTitle)
+                ? "Tu bloque de enfoque ya comenzÃ³. Â¡Vamos paso a paso!"
+                : $"Comenzaste a trabajar en \"{taskTitle}\". Â¡Vamos paso a paso!";
+
+#if UNITY_ANDROID
+            EnsureCycleNotificationChannel();
+            RequestPermissionIfNeeded();
+
+            AndroidNotification notification = new AndroidNotification
+            {
+                Title = "POMO: bloque iniciado",
+                Text = notificationText,
+                FireTime = DateTime.Now.AddSeconds(1),
+                ShouldAutoCancel = true,
+                SmallIcon = PomoSmallIconId,
+                LargeIcon = PomoLargeIconId
+            };
+
+            int notificationId = AndroidNotificationCenter.SendNotification(notification, CycleReminderChannelId);
+            if (notificationId > 0)
+            {
+                Debug.Log($"POMO DEBUG: notificaciÃ³n de inicio programada en Android (ID {notificationId}). Texto: {notificationText}");
+                return notificationId;
+            }
+
+            Debug.LogWarning("Android no pudo programar la notificaciÃ³n de inicio del bloque.");
+            return NoNotificationId;
+#else
+            Debug.Log($"POMO DEBUG: simulaciÃ³n en Editor. Se mostrarÃ­a la notificaciÃ³n: {notificationText}");
             return NoNotificationId;
 #endif
         }

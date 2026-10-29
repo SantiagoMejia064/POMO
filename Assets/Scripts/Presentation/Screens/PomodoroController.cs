@@ -186,6 +186,8 @@ namespace Pomo.Presentation.Screens
                 focusIntervals.Clear();
                 intervalStartedAt = activeFocusStartedAt;
                 intervalWorkedSeconds = 0;
+                Debug.Log("POMO DEBUG: bloque iniciado. Se solicitarÃ¡ la notificaciÃ³n de inicio.");
+                notificationService.NotifyBlockStarted(activeSessionTask?.title);
             }
         }
 

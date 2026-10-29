@@ -11,9 +11,12 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Scenes/Steven 1.unity
     guid: aeb858e2134b457ca6b20e8130af223a
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/Chantre 2.unity
     guid: 1e294878fa5a94e41baa4807c0298d30
+  - enabled: 1
+    path: Assets/Scenes/Chantre 3.unity
+    guid: 66cc01044fd3f5540ac0d887d8b0a0c8
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0
