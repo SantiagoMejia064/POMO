@@ -29,6 +29,13 @@ namespace Pomo.ServicesAdapters.Notifications
         // the application's default icon.
         private const string PomoSmallIconId = "pomo_small";
         private const string PomoLargeIconId = "pomo_large";
+        // All POMO notifications share the same status-bar icon. Each message
+        // can still use its own large illustration in the notification drawer.
+        private const string DailyGoalsSmallIconId = "pomo_small";
+        private const string DailyGoalsLargeIconId = "pomo_goals_large";
+        private const string DeletedTasksLargeIconId = "pomo_delete_large";
+        private const string DeletedTasksDateKey = "pomo.deleted-tasks.date";
+        private const string DeletedTasksCountKey = "pomo.deleted-tasks.count";
 
         public bool RhythmPermissionPending
         {
@@ -246,6 +253,92 @@ namespace Pomo.ServicesAdapters.Notifications
             return NoNotificationId;
 #else
             Debug.Log($"POMO DEBUG: simulaciÃ³n en Editor. Se mostrarÃ­a la notificaciÃ³n: {notificationText}");
+            return NoNotificationId;
+#endif
+        }
+
+        /// <summary>
+        /// Congratulates the student on completing the second task of the day.
+        /// </summary>
+        public int NotifyDailyGoalsAlmostCompleted()
+        {
+#if UNITY_ANDROID
+            EnsureCycleNotificationChannel();
+            RequestPermissionIfNeeded();
+
+            AndroidNotification notification = new AndroidNotification
+            {
+                Title = "YA CASI COMPLETAS TUS OBJETIVOS DEL DIA",
+                Text = "Ya completaste dos tareas hoy. Sigue asi, tu puedes!",
+                FireTime = DateTime.Now.AddSeconds(1),
+                ShouldAutoCancel = true,
+                SmallIcon = DailyGoalsSmallIconId,
+                LargeIcon = DailyGoalsLargeIconId
+            };
+
+            int notificationId = AndroidNotificationCenter.SendNotification(notification, CycleReminderChannelId);
+            if (notificationId > 0)
+            {
+                Debug.Log($"POMO DEBUG: notificacion de objetivos diarios programada (ID {notificationId}).");
+                return notificationId;
+            }
+
+            Debug.LogWarning("Android no pudo programar la notificacion de objetivos diarios.");
+            return NoNotificationId;
+#else
+            Debug.Log("POMO DEBUG: simulacion en Editor. Se mostraria: YA CASI COMPLETAS TUS OBJETIVOS DEL DIA.");
+            return NoNotificationId;
+#endif
+        }
+
+        /// <summary>
+        /// Counts deleted tasks for the current day and sends one playful
+        /// reminder when the second task is deleted. The count resets tomorrow.
+        /// </summary>
+        public int NotifyAfterSecondTaskDeletedToday()
+        {
+            string today = DateTime.Now.ToString("yyyy-MM-dd");
+            if (PlayerPrefs.GetString(DeletedTasksDateKey, string.Empty) != today)
+            {
+                PlayerPrefs.SetString(DeletedTasksDateKey, today);
+                PlayerPrefs.SetInt(DeletedTasksCountKey, 0);
+            }
+
+            int deletedToday = PlayerPrefs.GetInt(DeletedTasksCountKey, 0) + 1;
+            PlayerPrefs.SetInt(DeletedTasksCountKey, deletedToday);
+            PlayerPrefs.Save();
+
+            if (deletedToday != 2)
+            {
+                Debug.Log($"POMO DEBUG: tareas eliminadas hoy: {deletedToday}. Aun no se muestra aviso.");
+                return NoNotificationId;
+            }
+
+#if UNITY_ANDROID
+            EnsureCycleNotificationChannel();
+            RequestPermissionIfNeeded();
+
+            AndroidNotification notification = new AndroidNotification
+            {
+                Title = "Si claro, ma\u00F1ana empiezas...",
+                Text = "\"Como ayer\"",
+                FireTime = DateTime.Now.AddSeconds(1),
+                ShouldAutoCancel = true,
+                SmallIcon = PomoSmallIconId,
+                LargeIcon = DeletedTasksLargeIconId
+            };
+
+            int notificationId = AndroidNotificationCenter.SendNotification(notification, CycleReminderChannelId);
+            if (notificationId > 0)
+            {
+                Debug.Log($"POMO DEBUG: notificacion por dos tareas eliminadas programada (ID {notificationId}).");
+                return notificationId;
+            }
+
+            Debug.LogWarning("Android no pudo programar la notificacion por tareas eliminadas.");
+            return NoNotificationId;
+#else
+            Debug.Log("POMO DEBUG: simulacion en Editor. Se mostraria: Si claro, manana empiezas... \"Como ayer\".");
             return NoNotificationId;
 #endif
         }

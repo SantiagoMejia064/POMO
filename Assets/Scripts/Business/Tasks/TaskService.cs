@@ -150,7 +150,13 @@ namespace Pomo.Business.Tasks
             }
 
             notificationService.CancelTaskReminder(task);
-            return taskRepository.Delete(taskId);
+            bool deleted = taskRepository.Delete(taskId);
+            if (deleted)
+            {
+                notificationService.NotifyAfterSecondTaskDeletedToday();
+            }
+
+            return deleted;
         }
 
         public IReadOnlyList<TaskModel> GetTasksDueSoon(DateTimeOffset referenceDate, int daysAhead = 1)
@@ -227,6 +233,11 @@ namespace Pomo.Business.Tasks
                 taskRepository.Update(task);
             }
 
+            if (targetStatus == TaskStatus.Completed && CountTasksCompletedToday() == 2)
+            {
+                notificationService.NotifyDailyGoalsAlmostCompleted();
+            }
+
             return TaskStatusTransitionResult.Success;
         }
 
@@ -257,6 +268,25 @@ namespace Pomo.Business.Tasks
 
             task.reminderNotificationId = notificationId;
             taskRepository.Update(task);
+        }
+
+        private int CountTasksCompletedToday()
+        {
+            DateTime today = DateTime.Now.Date;
+            int completedToday = 0;
+
+            foreach (TaskModel task in taskRepository.GetAll())
+            {
+                if (task != null &&
+                    task.status == TaskStatus.Completed &&
+                    DateUtils.TryParseStoredDate(task.completedAt, out DateTimeOffset completedAt) &&
+                    completedAt.LocalDateTime.Date == today)
+                {
+                    completedToday++;
+                }
+            }
+
+            return completedToday;
         }
     }
 }
