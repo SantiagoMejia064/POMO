@@ -33,6 +33,8 @@ namespace Pomo.Presentation.Screens
         [SerializeField] private GameObject[] legacyFavoriteCards;
 
         [Header("Paneles existentes")]
+        [SerializeField] private GameObject workSection;
+        [SerializeField] private GameObject workSelectionPanel;
         [SerializeField] private GameObject workBlockLandingPanel;
         [SerializeField] private GameObject personalizeBlockPanel;
         [SerializeField] private GameObject favoriteBlocksPanel;
@@ -41,13 +43,11 @@ namespace Pomo.Presentation.Screens
 
         [Header("Finalización de ciclo")]
         [SerializeField] private GameObject homePanel;
-        [SerializeField] private GameObject completionContainer;
         [SerializeField] private GameObject completionPanel;
         [SerializeField] private GameObject completionFireRawImage;
         [SerializeField, Min(1f)] private float completionMessageSeconds = 7f;
 
         [Header("Misión nueva")]
-        [SerializeField] private Button createTaskFromBlockButton;
         [SerializeField] private TasksScreenController tasksScreenController;
 
         [Header("Guardar bloque existente")]
@@ -85,7 +85,7 @@ namespace Pomo.Presentation.Screens
 
             if (pomodoroController != null)
             {
-                pomodoroController.RestCompleted += ReturnHomeAfterCompletion;
+                pomodoroController.StateChanged += OnTimerStateChanged;
             }
         }
 
@@ -93,7 +93,7 @@ namespace Pomo.Presentation.Screens
         {
             if (pomodoroController != null)
             {
-                pomodoroController.RestCompleted -= ReturnHomeAfterCompletion;
+                pomodoroController.StateChanged -= OnTimerStateChanged;
             }
         }
 
@@ -103,15 +103,73 @@ namespace Pomo.Presentation.Screens
             RefreshDurationList();
         }
 
-        /// <summary>Opens the initial panel of the work-block section from the selection menu.</summary>
+        /// <summary>Restores the three work options whenever the section is entered.</summary>
+        public void OpenWorkSection()
+        {
+            ReturnToWorkSelection();
+        }
+
+        /// <summary>Opens the initial panel even when a previous visit disabled its containers.</summary>
         public void OpenWorkBlockSection()
         {
+            CancelPendingReturnHome();
+            if (workSection != null) workSection.SetActive(true);
             gameObject.SetActive(true);
 
-            if (completionContainer != null) completionContainer.SetActive(false);
-            if (completionPanel != null) completionPanel.SetActive(false);
-            if (timerPanel != null) timerPanel.SetActive(false);
+            HideBlockPanels();
             if (workBlockLandingPanel != null) workBlockLandingPanel.SetActive(true);
+            if (workSelectionPanel != null) workSelectionPanel.SetActive(false);
+            if (homePanel != null) homePanel.SetActive(false);
+        }
+
+        public void ReturnToWorkSelection()
+        {
+            CancelPendingReturnHome();
+            HideBlockPanels();
+            gameObject.SetActive(false);
+            if (workSection != null) workSection.SetActive(true);
+            if (workSelectionPanel != null) workSelectionPanel.SetActive(true);
+            if (homePanel != null) homePanel.SetActive(false);
+        }
+
+        public void ReturnHomeFromWork()
+        {
+            CancelPendingReturnHome();
+            // Show the destination before disabling the object running the completion coroutine.
+            if (homePanel != null) homePanel.SetActive(true);
+            HideBlockPanels();
+            if (workSelectionPanel != null) workSelectionPanel.SetActive(false);
+            if (workSection != null) workSection.SetActive(false);
+            gameObject.SetActive(false);
+        }
+
+        public void OpenCreateBlock()
+        {
+            CancelPendingReturnHome();
+            if (workSection != null) workSection.SetActive(true);
+            gameObject.SetActive(true);
+            HideBlockPanels();
+            if (workSelectionPanel != null) workSelectionPanel.SetActive(false);
+            if (homePanel != null) homePanel.SetActive(false);
+            if (personalizeBlockPanel != null) personalizeBlockPanel.SetActive(true);
+            RefreshConfigurationLists();
+        }
+
+        private void HideBlockPanels()
+        {
+            if (completionPanel != null) completionPanel.SetActive(false);
+            if (workBlockLandingPanel != null) workBlockLandingPanel.SetActive(false);
+            if (personalizeBlockPanel != null) personalizeBlockPanel.SetActive(false);
+            if (favoriteBlocksPanel != null) favoriteBlocksPanel.SetActive(false);
+            if (timerPanel != null) timerPanel.SetActive(false);
+            if (saveBlockPanel != null) saveBlockPanel.SetActive(false);
+        }
+
+        private void CancelPendingReturnHome()
+        {
+            if (returnHomeRoutine == null) return;
+            StopCoroutine(returnHomeRoutine);
+            returnHomeRoutine = null;
         }
 
         public void RefreshFavoriteBlocks()
@@ -166,24 +224,16 @@ namespace Pomo.Presentation.Screens
 
         public void RequestNewMission()
         {
-            if (personalizeBlockPanel != null)
+            if (tasksScreenController == null)
             {
-                personalizeBlockPanel.SetActive(false);
-            }
-
-            if (tasksScreenController != null)
-            {
-                tasksScreenController.OpenCreateTaskForm();
-                pomodoroController?.RequestNewMission();
+                Debug.LogError("Asigna TasksScreenController para crear una tarea desde el bloque.", this);
                 return;
             }
 
-            if (createTaskFromBlockButton != null)
-            {
-                createTaskFromBlockButton.gameObject.SetActive(true);
-                createTaskFromBlockButton.onClick.Invoke();
-            }
-
+            CancelPendingReturnHome();
+            tasksScreenController.OpenCreateTaskFormFromBlock(OpenCreateBlock);
+            HideBlockPanels();
+            if (workSection != null) workSection.SetActive(false);
             pomodoroController?.RequestNewMission();
         }
 
@@ -271,12 +321,6 @@ namespace Pomo.Presentation.Screens
             ClearContent(taskContent);
             taskItems.Clear();
 
-            if (newTaskItemPrefab != null)
-            {
-                WorkBlockItemView newTaskItem = Instantiate(newTaskItemPrefab, taskContent);
-                newTaskItem.BindTitleOnly("Nueva tarea", RequestNewMission);
-            }
-
             foreach (TaskModel task in pomodoroController.GetAvailableTasks())
             {
                 if (task == null || task.status == Pomo.Shared.Enums.TaskStatus.Completed)
@@ -290,6 +334,15 @@ namespace Pomo.Presentation.Screens
                     pomodoroController.SelectedTask.id == task.id);
                 taskItems.Add(item);
             }
+
+            if (newTaskItemPrefab != null)
+            {
+                WorkBlockItemView newTaskItem = Instantiate(newTaskItemPrefab, taskContent);
+                newTaskItem.BindTitleOnly("Nueva tarea", RequestNewMission);
+            }
+
+            ScrollRect taskScroll = taskContent.GetComponentInParent<ScrollRect>(true);
+            if (taskScroll != null) taskScroll.verticalNormalizedPosition = 1f;
         }
 
         private void RefreshDurationList()
@@ -388,7 +441,8 @@ namespace Pomo.Presentation.Screens
 
         private void OpenTimerPanel()
         {
-            if (completionContainer != null) completionContainer.SetActive(false);
+            if (workSelectionPanel != null) workSelectionPanel.SetActive(false);
+            if (workBlockLandingPanel != null) workBlockLandingPanel.SetActive(false);
             if (completionPanel != null) completionPanel.SetActive(false);
             if (personalizeBlockPanel != null) personalizeBlockPanel.SetActive(false);
             if (favoriteBlocksPanel != null) favoriteBlocksPanel.SetActive(false);
@@ -398,49 +452,40 @@ namespace Pomo.Presentation.Screens
             BlockPrepared?.Invoke();
         }
 
-        private void ReturnHomeAfterCompletion()
+        private void OnTimerStateChanged(Pomo.Shared.Enums.PomodoroTimerState state)
         {
-            if (timerPanel != null)
-            {
-                timerPanel.SetActive(false);
-            }
+            if (state != Pomo.Shared.Enums.PomodoroTimerState.Completed) return;
 
-            if (completionContainer != null)
-            {
-                completionContainer.SetActive(true);
-            }
-
-            if (completionPanel != null)
-            {
-                completionPanel.SetActive(true);
-            }
-
-            // This reward is unlocked only after PomodoroTimer raises RestCompleted.
             if (completionFireRawImage != null)
             {
                 completionFireRawImage.SetActive(true);
             }
 
-            if (returnHomeRoutine != null)
+            CancelPendingReturnHome();
+            // Some scenes have no completion overlay. Return home immediately instead
+            // of hiding the timer and leaving every screen blank for the message delay.
+            if (completionPanel == null)
             {
-                StopCoroutine(returnHomeRoutine);
+                pomodoroController?.ResetTimer();
+                ReturnHomeFromWork();
+                return;
             }
 
+            if (workSection != null) workSection.SetActive(true);
+            gameObject.SetActive(true);
+            HideBlockPanels();
+            if (workSelectionPanel != null) workSelectionPanel.SetActive(false);
+            completionPanel.SetActive(true);
             returnHomeRoutine = StartCoroutine(ReturnHomeAfterCompletionRoutine());
         }
 
         private IEnumerator ReturnHomeAfterCompletionRoutine()
         {
-            yield return new WaitForSeconds(completionMessageSeconds);
+            yield return new WaitForSecondsRealtime(completionMessageSeconds);
 
-            if (timerPanel != null) timerPanel.SetActive(false);
-            if (personalizeBlockPanel != null) personalizeBlockPanel.SetActive(false);
-            if (favoriteBlocksPanel != null) favoriteBlocksPanel.SetActive(false);
-            if (saveBlockPanel != null) saveBlockPanel.SetActive(false);
-            if (homePanel != null) homePanel.SetActive(true);
-
-            pomodoroController?.ResetTimer();
             returnHomeRoutine = null;
+            pomodoroController?.ResetTimer();
+            ReturnHomeFromWork();
         }
 
         private static void ClearContent(Transform content)
@@ -532,11 +577,7 @@ namespace Pomo.Presentation.Screens
 
             foreach (Button button in GetComponentsInChildren<Button>(true))
             {
-                if (button.gameObject.name == "Botón crear nuevo bloque")
-                {
-                    button.onClick.AddListener(RefreshConfigurationLists);
-                }
-                else if (button.gameObject.name == "Botón MIS BLOQUES FAVORITOS")
+                if (button.gameObject.name == "Botón MIS BLOQUES FAVORITOS")
                 {
                     button.onClick.AddListener(RefreshFavoriteBlocks);
                 }

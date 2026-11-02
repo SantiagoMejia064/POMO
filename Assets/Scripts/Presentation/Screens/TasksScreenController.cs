@@ -42,6 +42,8 @@ namespace Pomo.Presentation.Screens
         public Button submitTaskButton;
         public TMP_Text submitTaskButtonLabel;
         public Button cancelEditButton;
+        [SerializeField] private Button closeTaskFormButton;
+        [SerializeField] private Button closeTaskFormFromBlockButton;
 
         [Header("Detalle de tarea")]
         public GameObject taskDetailPanel;
@@ -90,6 +92,7 @@ namespace Pomo.Presentation.Screens
         private string calendarSelectedTaskId;
         private Action pendingDeleteAction;
         private bool taskDetailOpenedFromCalendar;
+        private Action returnToBlockCreation;
 
         private void Awake()
         {
@@ -159,6 +162,7 @@ namespace Pomo.Presentation.Screens
                 return;
             }
 
+            taskService.ReloadStoredTasks();
             TaskModel task = taskService.CreateTask(
                 titleInput.text,
                 descriptionInput.text,
@@ -173,7 +177,14 @@ namespace Pomo.Presentation.Screens
 
             ClearTaskForm();
             ShowFeedback("Tarea creada correctamente.");
-            ShowTaskList();
+            if (returnToBlockCreation != null)
+            {
+                CloseTaskFormToBlock();
+            }
+            else
+            {
+                ShowTaskList();
+            }
 
             ShowDueSoonNotification(task);
         }
@@ -298,6 +309,12 @@ namespace Pomo.Presentation.Screens
 
         public void CancelEditing()
         {
+            if (returnToBlockCreation != null)
+            {
+                CloseTaskFormToBlock();
+                return;
+            }
+
             ClearTaskForm();
             ClearEditForm();
             ShowFeedback("Edición cancelada.");
@@ -314,6 +331,7 @@ namespace Pomo.Presentation.Screens
         /// <summary>Entry point for the home-screen Tareas button.</summary>
         public void OpenTasks()
         {
+            SetBlockCreationReturn(null);
             if (tasksSection != null)
             {
                 tasksSection.SetActive(true);
@@ -334,8 +352,37 @@ namespace Pomo.Presentation.Screens
 
         public void OpenCreateTaskForm()
         {
+            SetBlockCreationReturn(null);
+            if (tasksSection != null) tasksSection.SetActive(true);
+            if (homePanel != null) homePanel.SetActive(false);
             ClearTaskForm();
             ShowTaskForm();
+        }
+
+        public void OpenCreateTaskFormFromBlock(Action onReturn)
+        {
+            OpenCreateTaskForm();
+            SetBlockCreationReturn(onReturn);
+        }
+
+        public void CloseTaskFormToBlock()
+        {
+            Action onReturn = returnToBlockCreation;
+            if (onReturn == null) return;
+
+            ClearTaskForm();
+            SetBlockCreationReturn(null);
+            // Restore the block before hiding the task section containing this form.
+            onReturn();
+            SetTaskPanels(false, false, false);
+            if (tasksSection != null) tasksSection.SetActive(false);
+        }
+
+        private void SetBlockCreationReturn(Action onReturn)
+        {
+            returnToBlockCreation = onReturn;
+            if (closeTaskFormButton != null) closeTaskFormButton.gameObject.SetActive(onReturn == null);
+            if (closeTaskFormFromBlockButton != null) closeTaskFormFromBlockButton.gameObject.SetActive(onReturn != null);
         }
 
         /// <summary>
