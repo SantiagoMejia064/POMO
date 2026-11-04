@@ -13,8 +13,9 @@ using UnityEngine;
 namespace Pomo.Presentation.Screens
 {
     /// <summary>
-    /// Inspector-friendly entry point for future block panels. It does not
-    /// search for, create, or modify any UI object.
+    /// Owns one study session independently from the visible panels. Keep this
+    /// component and its audio source on an object that navigation never disables.
+    /// It does not search for, create, or modify UI objects.
     /// </summary>
     [DisallowMultipleComponent]
     public class PomodoroController : MonoBehaviour
@@ -50,6 +51,10 @@ namespace Pomo.Presentation.Screens
         public bool IsBlockReady => sessionService != null && sessionService.IsReady;
         public bool HasTaskAndBlock => sessionService != null && sessionService.HasTaskAndBlock;
         public int LastFocusBlockCupsAwarded { get; private set; }
+        // Reopening an existing session must not configure or start a second timer.
+        // Completed is retained until the user explicitly prepares a new block.
+        public bool HasCurrentSession => timer != null && timer.State != PomodoroTimerState.Idle;
+        public string SessionTaskTitle => (activeSessionTask ?? SelectedTask)?.title ?? string.Empty;
         public bool CanChangeSessionSelection => timer == null ||
             (timer.State != PomodoroTimerState.Running &&
              timer.State != PomodoroTimerState.Paused &&
@@ -82,9 +87,10 @@ namespace Pomo.Presentation.Screens
 
         private void Update()
         {
+            float elapsedSeconds = Time.unscaledDeltaTime;
             if (timer.State == PomodoroTimerState.Running && !timer.IsRestPhase && activeSessionId != null)
-                intervalWorkedSeconds += Math.Min(Math.Max(0f, Time.deltaTime), timer.RemainingSeconds);
-            timer.Advance(Time.deltaTime);
+                intervalWorkedSeconds += Math.Min(Math.Max(0f, elapsedSeconds), timer.RemainingSeconds);
+            timer.Advance(elapsedSeconds);
         }
 
         private void OnApplicationPause(bool paused)

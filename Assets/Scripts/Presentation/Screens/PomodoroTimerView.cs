@@ -1,6 +1,7 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using Pomo.Shared.Enums;
 
 namespace Pomo.Presentation.Screens
 {
@@ -20,6 +21,16 @@ namespace Pomo.Presentation.Screens
         [SerializeField] private Image backgroundPanel;
         [SerializeField] private Color workColor = new Color(0.3137255f, 0.47058824f, 0.6862745f, 1f);
         [SerializeField] private Color restColor = new Color(0.55f, 0.8f, 0.62f, 1f);
+        [Header("Estado de la sesión y controles existentes")]
+        [SerializeField] private TMP_Text taskTitleText;
+        [SerializeField] private TMP_Text startButtonLabel;
+        [SerializeField] private Button startButton;
+        [SerializeField] private Button pauseButton;
+        [SerializeField] private Button resumeButton;
+        [SerializeField] private Button restartButton;
+        [SerializeField] private Button addToFavoritesButton;
+        [SerializeField] private GameObject pauseFeedback;
+        [SerializeField] private GameObject legacyWarningPanel;
 
         private Image timerPanel;
 
@@ -33,9 +44,14 @@ namespace Pomo.Presentation.Screens
             {
                 timerPanel = backgroundPanel;
             }
+            if (taskTitleText != null) taskTitleText.richText = false;
+            if (legacyWarningPanel != null) legacyWarningPanel.SetActive(false);
         }
 
-        private void Update()
+        private void OnEnable() => RefreshView();
+        private void Update() => RefreshView();
+
+        private void RefreshView()
         {
             if (pomodoroController == null)
             {
@@ -56,10 +72,38 @@ namespace Pomo.Presentation.Screens
             {
                 timerPanel.color = pomodoroController.IsRestPhase ? restColor : workColor;
             }
+            RefreshControls();
+        }
+
+        private void RefreshControls()
+        {
+            PomodoroTimerState state = pomodoroController.State;
+            bool completed = state == PomodoroTimerState.Completed;
+            if (taskTitleText != null) taskTitleText.text = pomodoroController.SessionTaskTitle;
+            if (startButton != null)
+            {
+                startButton.gameObject.SetActive(state == PomodoroTimerState.Idle || completed);
+                startButton.interactable = completed || pomodoroController.IsBlockReady;
+            }
+            if (startButtonLabel != null) startButtonLabel.text = completed ? "Nuevo bloque" : "Comenzar bloque";
+            if (pauseButton != null)
+                pauseButton.interactable = state == PomodoroTimerState.Running || state == PomodoroTimerState.Resting;
+            if (resumeButton != null) resumeButton.interactable = state == PomodoroTimerState.Paused;
+            if (restartButton != null)
+                restartButton.gameObject.SetActive(pomodoroController.HasCurrentSession && !completed);
+            if (addToFavoritesButton != null)
+                addToFavoritesButton.gameObject.SetActive(pomodoroController.CanChangeSessionSelection);
+            if (pauseFeedback != null) pauseFeedback.SetActive(state == PomodoroTimerState.Paused);
         }
 
         private string GetStateLabel()
         {
+            if (pomodoroController.State == PomodoroTimerState.Completed)
+                return pomodoroController.LastFocusBlockCupsAwarded > 0
+                    ? $"¡Ciclo terminado! Ganaste {pomodoroController.LastFocusBlockCupsAwarded} copas."
+                    : "¡Ciclo terminado!";
+            if (pomodoroController.State == PomodoroTimerState.Paused)
+                return pomodoroController.IsRestPhase ? "Descanso pausado" : "Pausado";
             if (pomodoroController.IsRestPhase)
             {
                 return "TÓMATE UN DESCANSO";
@@ -67,14 +111,8 @@ namespace Pomo.Presentation.Screens
 
             switch (pomodoroController.State)
             {
-                case Pomo.Shared.Enums.PomodoroTimerState.Running:
+                case PomodoroTimerState.Running:
                     return "En progreso";
-                case Pomo.Shared.Enums.PomodoroTimerState.Paused:
-                    return "Pausado";
-                case Pomo.Shared.Enums.PomodoroTimerState.Completed:
-                    return pomodoroController.LastFocusBlockCupsAwarded > 0
-                        ? $"¡Ganaste {pomodoroController.LastFocusBlockCupsAwarded} copas!"
-                        : "¡Bloque terminado!";
                 default:
                     return "Listo";
             }

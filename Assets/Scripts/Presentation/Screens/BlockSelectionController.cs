@@ -116,6 +116,8 @@ namespace Pomo.Presentation.Screens
             if (workSection != null) workSection.SetActive(true);
             gameObject.SetActive(true);
 
+            if (TryOpenCurrentSession()) return;
+
             HideBlockPanels();
             if (workBlockLandingPanel != null) workBlockLandingPanel.SetActive(true);
             if (workSelectionPanel != null) workSelectionPanel.SetActive(false);
@@ -212,6 +214,8 @@ namespace Pomo.Presentation.Screens
 
         public void ContinueToTimer()
         {
+            if (TryOpenCurrentSession()) return;
+
             if (pomodoroController == null || !pomodoroController.TryPrepareCustomBlock())
             {
                 ShowSelectionRequiredMessage(true);
@@ -424,6 +428,8 @@ namespace Pomo.Presentation.Screens
 
         private void SelectFavoriteAndOpenTimer(string blockId)
         {
+            if (TryOpenCurrentSession()) return;
+
             if (!CanChangeSessionSelection())
             {
                 return;
@@ -439,17 +445,31 @@ namespace Pomo.Presentation.Screens
             OpenTimerPanel();
         }
 
-        private void OpenTimerPanel()
+        /// <summary>Shows the existing session without preparing or restarting its timer.</summary>
+        public bool TryOpenCurrentSession()
+        {
+            if (pomodoroController == null || !pomodoroController.HasCurrentSession)
+            {
+                return false;
+            }
+
+            ShowSelectionRequiredMessage(false);
+            OpenTimerPanel(false);
+            return true;
+        }
+
+        private void OpenTimerPanel(bool wasPrepared = true)
         {
             if (workSelectionPanel != null) workSelectionPanel.SetActive(false);
             if (workBlockLandingPanel != null) workBlockLandingPanel.SetActive(false);
             if (completionPanel != null) completionPanel.SetActive(false);
             if (personalizeBlockPanel != null) personalizeBlockPanel.SetActive(false);
             if (favoriteBlocksPanel != null) favoriteBlocksPanel.SetActive(false);
+            if (saveBlockPanel != null) saveBlockPanel.SetActive(false);
             if (timerPanel != null) timerPanel.SetActive(true);
-            SetAddToFavoritesButtonVisible(true);
+            SetAddToFavoritesButtonVisible(pomodoroController != null && pomodoroController.CanChangeSessionSelection);
             RefreshAddToFavoritesButtonLabel();
-            BlockPrepared?.Invoke();
+            if (wasPrepared) BlockPrepared?.Invoke();
         }
 
         private void OnTimerStateChanged(Pomo.Shared.Enums.PomodoroTimerState state)
