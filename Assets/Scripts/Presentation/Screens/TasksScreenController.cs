@@ -1,10 +1,12 @@
 using System;
+using System.Collections;
 using Pomo.Business.Pomodoro;
 using Pomo.Business.Progress;
 using Pomo.Business.Tasks;
 using Pomo.Data.Models;
 using Pomo.Shared.Enums;
 using Pomo.Shared.Utilities;
+using Pomo.ServicesAdapters.Notifications;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -25,6 +27,7 @@ namespace Pomo.Presentation.Screens
 
         [Header("Notificaciones")]
         [SerializeField] private PomoNotifications notificationUI;
+        [SerializeField] private NotificationPermissionController permisosNotificaciones;
 
         [Header("Paneles de tareas")]
         public GameObject taskListPanel;
@@ -91,6 +94,8 @@ namespace Pomo.Presentation.Screens
         private string detailTaskId;
         private string calendarSelectedTaskId;
         private Action pendingDeleteAction;
+        private Transform deleteConfirmationOriginalParent;
+        private int deleteConfirmationOriginalSiblingIndex;
         private bool taskDetailOpenedFromCalendar;
         private Action returnToBlockCreation;
 
@@ -187,6 +192,26 @@ namespace Pomo.Presentation.Screens
             }
 
             ShowDueSoonNotification(task);
+            StartCoroutine(OfferTaskReminder(task));
+        }
+
+        private IEnumerator OfferTaskReminder(TaskModel task)
+        {
+            if (permisosNotificaciones == null || !new NotificationService().IsAndroidDevice ||
+                task == null || task.reminderNotificationId > 0 || task.status == TaskStatus.Completed ||
+                !DateUtils.TryParseStoredDate(task.dueDate, out DateTimeOffset due) ||
+                due.LocalDateTime.Date.AddHours(9) <= DateTime.Now) yield break;
+            bool permitido = false;
+            yield return permisosNotificaciones.SolicitarNotificaciones(
+                "POMO puede avisarte el día de vencimiento de tu tarea. La tarea ya está guardada: si no permites notificaciones, podrás seguir consultándola y editándola sin ese aviso.",
+                value => permitido = value);
+            if (!permitido)
+            {
+                ShowFeedback("Tarea guardada sin notificación. " + permisosNotificaciones.MensajeResultado);
+                yield break;
+            }
+            bool scheduled = taskService.TryScheduleReminderForTask(task.id);
+            ShowFeedback(scheduled ? "Tarea guardada con recordatorio." : "Tarea guardada. No se pudo programar su notificación.");
         }
 
         public void BeginEdit(string taskId)
@@ -292,7 +317,22 @@ namespace Pomo.Presentation.Screens
                 return;
             }
 
-            if (!taskService.DeleteTask(calendarSelectedTaskId))
+            taskService.ReloadStoredTasks();
+            TaskModel task = taskService.GetTask(calendarSelectedTaskId);
+            if (task == null)
+            {
+                ShowFeedback("No fue posible encontrar la tarea seleccionada.");
+                return;
+            }
+
+            string taskId = task.id;
+            ShowDeleteConfirmation(task.title, () => DeleteCalendarTask(taskId));
+        }
+
+        private void DeleteCalendarTask(string taskId)
+        {
+            taskService.ReloadStoredTasks();
+            if (!taskService.DeleteTask(taskId))
             {
                 ShowFeedback("No fue posible eliminar la tarea.");
                 return;
@@ -450,6 +490,7 @@ namespace Pomo.Presentation.Screens
 
         public void ShowDeleteConfirmation(string taskTitle, Action onConfirm)
         {
+            CloseDeleteConfirmation();
             pendingDeleteAction = onConfirm;
 
             if (deleteConfirmationTitleText != null)
@@ -465,6 +506,17 @@ namespace Pomo.Presentation.Screens
 
             if (deleteConfirmationPanel != null)
             {
+                Transform panelTransform = deleteConfirmationPanel.transform;
+                Canvas canvas = deleteConfirmationPanel.GetComponentInParent<Canvas>(true);
+                if (panelTransform.parent != null && !panelTransform.parent.gameObject.activeInHierarchy &&
+                    canvas != null && canvas.rootCanvas.gameObject.activeInHierarchy)
+                {
+                    // Calendar leaves the Tasks section hidden. Reuse its modal above both sections.
+                    deleteConfirmationOriginalParent = panelTransform.parent;
+                    deleteConfirmationOriginalSiblingIndex = panelTransform.GetSiblingIndex();
+                    panelTransform.SetParent(canvas.rootCanvas.transform, true);
+                    panelTransform.SetAsLastSibling();
+                }
                 deleteConfirmationPanel.SetActive(true);
             }
             else
@@ -605,6 +657,7 @@ namespace Pomo.Presentation.Screens
             {
                 savedChangesPanel.SetActive(true);
             }
+            StartCoroutine(OfferTaskReminder(updatedTask));
         }
 
         private void ClearTaskForm()
@@ -831,7 +884,13 @@ namespace Pomo.Presentation.Screens
             if (deleteConfirmationPanel != null)
             {
                 deleteConfirmationPanel.SetActive(false);
+                if (deleteConfirmationOriginalParent != null)
+                {
+                    deleteConfirmationPanel.transform.SetParent(deleteConfirmationOriginalParent, true);
+                    deleteConfirmationPanel.transform.SetSiblingIndex(deleteConfirmationOriginalSiblingIndex);
+                }
             }
+            deleteConfirmationOriginalParent = null;
         }
 
         private void SetupWorkBlocks()

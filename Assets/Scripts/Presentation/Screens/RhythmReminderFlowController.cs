@@ -46,6 +46,7 @@ namespace Pomo.Presentation.Screens
         public TMP_Text confirmationTitle;
         public TMP_Text confirmationDetails;
         public TMP_Text confirmationNotice;
+        [SerializeField] private NotificationPermissionController permisosNotificaciones;
 
         private static readonly CultureInfo Spanish = CultureInfo.GetCultureInfo("es-CO");
         private static readonly Color Blue = new Color32(75, 115, 169, 255);
@@ -252,16 +253,31 @@ namespace Pomo.Presentation.Screens
         {
             busy = true;
             confirmButton.interactable = false;
-            bool success = reminders.TryCreate(draftId, nameInput.text, at, out var reminder, out var result, out string message);
-            if (!success && result == RhythmNotificationResult.PermissionPending)
+            var adapter = new NotificationService();
+            if (adapter.IsAndroidDevice)
             {
-                hourFeedback.text = message;
-                var adapter = new NotificationService();
-                float until = Time.realtimeSinceStartup + 60;
-                do { yield return new WaitForSecondsRealtime(.5f); }
-                while (adapter.RhythmPermissionPending && Time.realtimeSinceStartup < until);
-                success = reminders.TryCreate(draftId, nameInput.text, at, out reminder, out result, out message);
+                bool permitido = false;
+                if (permisosNotificaciones != null)
+                {
+                    yield return permisosNotificaciones.SolicitarNotificaciones(
+                        "El recordatorio de Ritmo necesita notificaciones para mostrarte el aviso que elegiste. Si no las permites, puedes seguir consultando tu ritmo, calendario y progreso.",
+                        value => permitido = value);
+                    if (permitido && !adapter.ExactSchedulingAllowed)
+                    {
+                        permitido = false;
+                        yield return permisosNotificaciones.SolicitarAlarmasExactas(value => permitido = value);
+                    }
+                }
+                if (!permitido)
+                {
+                    busy = false;
+                    hourFeedback.text = permisosNotificaciones != null ? permisosNotificaciones.MensajeResultado :
+                        "No se pudo abrir la explicación de permisos. Las demás funciones siguen disponibles.";
+                    confirmButton.interactable = selectedHour.HasValue;
+                    yield break;
+                }
             }
+            bool success = reminders.TryCreate(draftId, nameInput.text, at, out var reminder, out var result, out string message);
             busy = false;
             if (!success)
             {

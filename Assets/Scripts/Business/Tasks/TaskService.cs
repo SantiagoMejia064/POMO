@@ -264,6 +264,16 @@ namespace Pomo.Business.Tasks
             taskRepository.Reload();
         }
 
+        public bool TryScheduleReminderForTask(string taskId)
+        {
+            taskRepository.Reload();
+            TaskModel task = taskRepository.GetById(taskId);
+            if (task == null || task.status == TaskStatus.Completed) return false;
+            if (task.reminderNotificationId > 0) return true;
+            ScheduleTaskReminder(task);
+            return task.reminderNotificationId > 0;
+        }
+
         private void ScheduleTaskReminder(TaskModel task)
         {
             int notificationId = notificationService.ScheduleTaskReminder(task);

@@ -106,6 +106,13 @@ namespace Pomo.EditorTools
                 {
                     case 0:
                         Require(Object("Bienvenid@").activeInHierarchy && !Object("Panel INICIO").activeInHierarchy, "Welcome is the only initial screen");
+                        var consent = Object("Bienvenid@").GetComponent<PrivacyConsentController>();
+                        if (consent != null && consent.IsBlockingWelcome)
+                        {
+                            // Wait for the user's normal interaction; this check never accepts for them.
+                            nextStep = EditorApplication.timeSinceStartup + 1;
+                            return;
+                        }
                         Object("Bienvenid@").GetComponentInChildren<TMP_InputField>().text = "Prueba integración";
                         Object("Bienvenid@").GetComponentInChildren<Button>().onClick.Invoke();
                         Record("Welcome visible; original next button invoked"); break;

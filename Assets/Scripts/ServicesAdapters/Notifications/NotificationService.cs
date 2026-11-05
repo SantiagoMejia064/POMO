@@ -3,13 +3,14 @@ using Pomo.Data.Models;
 using Pomo.Shared.Utilities;
 using UnityEngine;
 
-#if UNITY_ANDROID
+#if UNITY_ANDROID && !UNITY_EDITOR
 using Unity.Notifications.Android;
 #endif
 
 namespace Pomo.ServicesAdapters.Notifications
 {
     public enum RhythmNotificationResult { Scheduled, EditorPreview, PermissionPending, Failed }
+    public enum NotificationAccessState { Unsupported, NotRequested, Pending, Allowed, Denied }
     /// <summary>
     /// Schedules device-local reminders for task deadlines. The task form only
     /// collects a date, so reminders are consistently delivered at 09:00 local
@@ -37,16 +38,76 @@ namespace Pomo.ServicesAdapters.Notifications
         private const string DeletedTasksDateKey = "pomo.deleted-tasks.date";
         private const string DeletedTasksCountKey = "pomo.deleted-tasks.count";
 
-        public bool RhythmPermissionPending
+        public bool IsAndroidDevice
         {
             get
             {
 #if UNITY_ANDROID && !UNITY_EDITOR
-                return AndroidNotificationCenter.UserPermissionToPost == PermissionStatus.RequestPending;
+                return true;
 #else
                 return false;
 #endif
             }
+        }
+
+        public NotificationAccessState PermissionState => ReadPermissionState();
+        public bool RhythmPermissionPending => PermissionState == NotificationAccessState.Pending;
+
+        private static NotificationAccessState ReadPermissionState()
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {
+                if (permissionRequest != null && permissionRequest.Status == PermissionStatus.RequestPending)
+                    return NotificationAccessState.Pending;
+                switch (AndroidNotificationCenter.UserPermissionToPost)
+                {
+                    case PermissionStatus.Allowed: return NotificationAccessState.Allowed;
+                    case PermissionStatus.NotRequested: return NotificationAccessState.NotRequested;
+                    case PermissionStatus.RequestPending: return NotificationAccessState.Pending;
+                    default: return NotificationAccessState.Denied;
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("POMO: no se pudo consultar el permiso de notificaciones. " + exception.Message);
+                return NotificationAccessState.Denied;
+            }
+#else
+            return NotificationAccessState.Unsupported;
+#endif
+        }
+
+        // Only the permission UI calls this after an explicit user choice.
+        public void RequestNotificationPermissionFromUser()
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            if (PermissionState != NotificationAccessState.NotRequested) return;
+            try { permissionRequest = new PermissionRequest(); }
+            catch (Exception exception) { Debug.LogWarning("POMO: no se pudo abrir el permiso. " + exception.Message); }
+#endif
+        }
+
+        public bool ExactSchedulingAllowed
+        {
+            get
+            {
+#if UNITY_ANDROID && !UNITY_EDITOR
+                try { return AndroidNotificationCenter.UsingExactScheduling; }
+                catch (Exception) { return false; }
+#else
+                return false;
+#endif
+            }
+        }
+
+        public void RequestExactSchedulingFromUser()
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            if (PermissionState != NotificationAccessState.Allowed || ExactSchedulingAllowed) return;
+            try { AndroidNotificationCenter.RequestExactScheduling(); }
+            catch (Exception exception) { Debug.LogWarning("POMO: no se pudo abrir el acceso a alarmas exactas. " + exception.Message); }
+#endif
         }
 
         public RhythmNotificationResult ScheduleRhythmReminder(RhythmReminderModel reminder, out string message)
@@ -61,13 +122,12 @@ namespace Pomo.ServicesAdapters.Notifications
 #if UNITY_ANDROID && !UNITY_EDITOR
             try
             {
-                var permission = AndroidNotificationCenter.UserPermissionToPost;
-                if (permission != PermissionStatus.Allowed)
+                var permission = PermissionState;
+                if (permission != NotificationAccessState.Allowed)
                 {
-                    if (permission == PermissionStatus.NotRequested || permission == PermissionStatus.RequestPending)
+                    if (permission == NotificationAccessState.NotRequested || permission == NotificationAccessState.Pending)
                     {
-                        RequestPermissionIfNeeded();
-                        message = "Acepta el permiso de notificaciones para continuar.";
+                        message = "El aviso necesita permiso de notificaciones. Puedes seguir usando las demás funciones de POMO.";
                         return RhythmNotificationResult.PermissionPending;
                     }
                     message = "Activa las notificaciones de POMO en los ajustes de Android y vuelve a confirmar.";
@@ -75,8 +135,7 @@ namespace Pomo.ServicesAdapters.Notifications
                 }
                 if (!AndroidNotificationCenter.UsingExactScheduling)
                 {
-                    AndroidNotificationCenter.RequestExactScheduling();
-                    message = "Permite alarmas exactas en Android y confirma otra vez. El aviso aún no está programado.";
+                    message = "El aviso a la hora elegida necesita acceso a alarmas exactas. Las demás funciones siguen disponibles.";
                     return RhythmNotificationResult.Failed;
                 }
                 AndroidNotificationCenter.RegisterNotificationChannel(new AndroidNotificationChannel
@@ -127,7 +186,7 @@ namespace Pomo.ServicesAdapters.Notifications
 #endif
         }
 
-#if UNITY_ANDROID
+#if UNITY_ANDROID && !UNITY_EDITOR
         private static PermissionRequest permissionRequest;
 #endif
 
@@ -152,9 +211,7 @@ namespace Pomo.ServicesAdapters.Notifications
                 return NoNotificationId;
             }
 
-#if UNITY_ANDROID
-            EnsureNotificationChannel();
-            RequestPermissionIfNeeded();
+#if UNITY_ANDROID && !UNITY_EDITOR
 
             AndroidNotification notification = new AndroidNotification
             {
@@ -164,7 +221,7 @@ namespace Pomo.ServicesAdapters.Notifications
                 ShouldAutoCancel = true
             };
 
-            int notificationId = AndroidNotificationCenter.SendNotification(notification, TaskReminderChannelId);
+            int notificationId = SendNotificationSafely(notification, TaskReminderChannelId);
 
             if (notificationId > 0)
             {
@@ -190,9 +247,7 @@ namespace Pomo.ServicesAdapters.Notifications
                 ? "Tu bloque de trabajo terminó. Es momento de descansar."
                 : $"Terminaste el bloque de trabajo de \"{taskTitle}\". Es momento de descansar.";
 
-#if UNITY_ANDROID
-            EnsureCycleNotificationChannel();
-            RequestPermissionIfNeeded();
+#if UNITY_ANDROID && !UNITY_EDITOR
 
             AndroidNotification notification = new AndroidNotification
             {
@@ -202,7 +257,7 @@ namespace Pomo.ServicesAdapters.Notifications
                 ShouldAutoCancel = true
             };
 
-            int notificationId = AndroidNotificationCenter.SendNotification(notification, CycleReminderChannelId);
+            int notificationId = SendNotificationSafely(notification, CycleReminderChannelId);
             if (notificationId > 0)
             {
                 Debug.Log($"Recordatorio de descanso enviado: {notificationText}");
@@ -228,9 +283,7 @@ namespace Pomo.ServicesAdapters.Notifications
                 ? "Tu bloque de enfoque ya comenzo. Vamos paso a paso!"
                 : $"Comenzaste a trabajar en \"{taskTitle}\". Vamos paso a paso!";
 
-#if UNITY_ANDROID
-            EnsureCycleNotificationChannel();
-            RequestPermissionIfNeeded();
+#if UNITY_ANDROID && !UNITY_EDITOR
 
             AndroidNotification notification = new AndroidNotification
             {
@@ -242,7 +295,7 @@ namespace Pomo.ServicesAdapters.Notifications
                 LargeIcon = PomoLargeIconId
             };
 
-            int notificationId = AndroidNotificationCenter.SendNotification(notification, CycleReminderChannelId);
+            int notificationId = SendNotificationSafely(notification, CycleReminderChannelId);
             if (notificationId > 0)
             {
                 Debug.Log($"POMO DEBUG: notificaciÃ³n de inicio programada en Android (ID {notificationId}). Texto: {notificationText}");
@@ -262,9 +315,7 @@ namespace Pomo.ServicesAdapters.Notifications
         /// </summary>
         public int NotifyDailyGoalsAlmostCompleted()
         {
-#if UNITY_ANDROID
-            EnsureCycleNotificationChannel();
-            RequestPermissionIfNeeded();
+#if UNITY_ANDROID && !UNITY_EDITOR
 
             AndroidNotification notification = new AndroidNotification
             {
@@ -276,7 +327,7 @@ namespace Pomo.ServicesAdapters.Notifications
                 LargeIcon = DailyGoalsLargeIconId
             };
 
-            int notificationId = AndroidNotificationCenter.SendNotification(notification, CycleReminderChannelId);
+            int notificationId = SendNotificationSafely(notification, CycleReminderChannelId);
             if (notificationId > 0)
             {
                 Debug.Log($"POMO DEBUG: notificacion de objetivos diarios programada (ID {notificationId}).");
@@ -314,9 +365,7 @@ namespace Pomo.ServicesAdapters.Notifications
                 return NoNotificationId;
             }
 
-#if UNITY_ANDROID
-            EnsureCycleNotificationChannel();
-            RequestPermissionIfNeeded();
+#if UNITY_ANDROID && !UNITY_EDITOR
 
             AndroidNotification notification = new AndroidNotification
             {
@@ -328,7 +377,7 @@ namespace Pomo.ServicesAdapters.Notifications
                 LargeIcon = DeletedTasksLargeIconId
             };
 
-            int notificationId = AndroidNotificationCenter.SendNotification(notification, CycleReminderChannelId);
+            int notificationId = SendNotificationSafely(notification, CycleReminderChannelId);
             if (notificationId > 0)
             {
                 Debug.Log($"POMO DEBUG: notificacion por dos tareas eliminadas programada (ID {notificationId}).");
@@ -353,18 +402,26 @@ namespace Pomo.ServicesAdapters.Notifications
                 return false;
             }
 
-#if UNITY_ANDROID
-            AndroidNotificationCenter.CancelScheduledNotification(task.reminderNotificationId);
-            AndroidNotificationCenter.CancelDisplayedNotification(task.reminderNotificationId);
-            Debug.Log($"Recordatorio cancelado para \"{task.title}\".");
-            return true;
+#if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {
+                AndroidNotificationCenter.CancelScheduledNotification(task.reminderNotificationId);
+                AndroidNotificationCenter.CancelDisplayedNotification(task.reminderNotificationId);
+                Debug.Log($"Recordatorio cancelado para \"{task.title}\".");
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("POMO: no se pudo cancelar el aviso de Android. " + exception.Message);
+                return false;
+            }
 #else
             Debug.Log($"El recordatorio de \"{task.title}\" se cancelará en Android al completar la tarea.");
             return false;
 #endif
         }
 
-#if UNITY_ANDROID
+#if UNITY_ANDROID && !UNITY_EDITOR
         private static void EnsureCycleNotificationChannel()
         {
             AndroidNotificationChannel channel = new AndroidNotificationChannel
@@ -395,15 +452,20 @@ namespace Pomo.ServicesAdapters.Notifications
             AndroidNotificationCenter.RegisterNotificationChannel(channel);
         }
 
-        private static void RequestPermissionIfNeeded()
+        private static int SendNotificationSafely(AndroidNotification notification, string channelId)
         {
-            if (AndroidNotificationCenter.UserPermissionToPost == PermissionStatus.Allowed ||
-                AndroidNotificationCenter.UserPermissionToPost == PermissionStatus.RequestPending)
+            if (ReadPermissionState() != NotificationAccessState.Allowed) return NoNotificationId;
+            try
             {
-                return;
+                if (channelId == TaskReminderChannelId) EnsureNotificationChannel();
+                else EnsureCycleNotificationChannel();
+                return AndroidNotificationCenter.SendNotification(notification, channelId);
             }
-
-            permissionRequest = new PermissionRequest();
+            catch (Exception exception)
+            {
+                Debug.LogWarning("POMO: el dato se conserva, pero no se pudo programar su aviso. " + exception.Message);
+                return NoNotificationId;
+            }
         }
 #endif
     }
