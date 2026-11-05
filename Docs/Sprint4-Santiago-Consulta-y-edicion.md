@@ -12,7 +12,7 @@ Revisión técnica realizada sobre `Santiago`. Santiago confirmó en Play los si
 
 **Comprobado:** los nueve controladores revisados existen en Santiago y sus referencias locales apuntan a objetos existentes. Lista, detalle y campos de edición de tareas están asignados; Guardar, descartar y confirmaciones tienen callbacks conectados.
 
-**Pendientes detectados:** no hay perfil persistente de nombre/hábitos; coordinar su integración con Jean. No hay acceso de edición a recordatorios ya creados desde Calendario. Unificar la persistencia del sonido y evitar presentar el resumen de Calendario como una edición efectiva.
+**Pendientes detectados:** los hábitos no se persisten; coordinar su integración con Jean. El nombre ya se guarda localmente para confirmar el borrado. No hay acceso de edición a recordatorios ya creados desde Calendario. Unificar la persistencia del sonido y evitar presentar el resumen de Calendario como una edición efectiva.
 
 ## Validación en Play
 

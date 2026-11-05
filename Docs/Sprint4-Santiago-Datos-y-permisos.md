@@ -15,12 +15,11 @@ Todo se guarda localmente en `Application.persistentDataPath`, mediante `JsonSto
 | `store-inventory.json` | Artículos adquiridos | `StoreInventoryService` / `StoreInventoryRepository` |
 
 **PlayerPrefs:** `Pomo_AudioEnabled`, `pomo.deleted-tasks.date`, `pomo.deleted-tasks.count`
-y `pomo.privacy.accepted-version` (versión del aviso aceptado).
+y `pomo.privacy.accepted-version` (versión del aviso aceptado), además de `pomo.profile.name` (nombre obligatorio de bienvenida usado para confirmar el borrado).
 El paquete de notificaciones también mantiene `com.unity.androidnotifications.PostNotificationsPermission`;
 esa clave no concede ni revoca permisos de Android.
 
-La bienvenida integrada tiene nombre y hábitos en pantalla, pero todavía no los persiste.
-Coordinar con Jean el nombre y el indicador de primera entrada. Guardar hábitos solo si una función real los usa.
+El nombre de bienvenida ya se persiste localmente. Los hábitos siguen siendo elecciones en pantalla; guardar hábitos solo si una función real los usa. Coordinar con Jean el indicador de primera entrada.
 
 ## Permisos esperados
 

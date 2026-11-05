@@ -48,7 +48,7 @@ namespace Pomo.Presentation.Screens
         public TMP_Text nextGuideLabel;
         public GameObject guideDetails;
         [Header("Desarrollo: solo Editor, no se incluye en Android")]
-        public bool initializeDemoDataInEditor = true;
+        public bool initializeDemoDataInEditor = false;
         public GameObject rhythmSection;
         public GameObject workSection;
         public GameObject workSelection;

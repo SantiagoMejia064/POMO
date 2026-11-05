@@ -3,10 +3,10 @@ Términos y condiciones y privacidad
 POMO es una herramienta para organizar tus tareas y acompañar tus hábitos de estudio. El nombre y las elecciones que introduces forman parte de la bienvenida.
 
 Qué se guarda
-Tus tareas (título, descripción, asignatura, fechas y estado), bloques y favoritos, recordatorios, historial de estudio, trofeos, saldo de copas, artículos adquiridos y preferencias de sonido. También se conservan un contador diario de tareas eliminadas para los avisos de Pomo y la versión de estos términos que aceptaste.
+Tu nombre, tareas (título, descripción, asignatura, fechas y estado), bloques y favoritos, recordatorios, historial de estudio, trofeos, saldo de copas, artículos adquiridos y preferencias de sonido. También se conservan un contador diario de tareas eliminadas para los avisos de Pomo y la versión de estos términos que aceptaste.
 
 Para qué se usa
-Para organizar tus actividades, mostrar tu progreso, identificar franjas con más actividad registrada, conservar tus artículos y generar avisos. Las sugerencias de POMO no son diagnósticos de salud ni una medida de tu estado emocional.
+Para organizar tus actividades, mostrar tu progreso, identificar franjas con más actividad registrada, conservar tus artículos y generar avisos. Tu nombre se usa para confirmar que deseas borrar todos tus datos. Las sugerencias de POMO no son diagnósticos de salud ni una medida de tu estado emocional.
 
 Dónde se guarda
 La información de tus actividades y preferencias se conserva localmente en este dispositivo, en archivos y preferencias de la aplicación. POMO no utiliza una cuenta ni un servicio propio de almacenamiento en la nube para esos datos.
@@ -15,4 +15,5 @@ Notificaciones e historial
 Las notificaciones de Android pueden mostrar el título de una tarea o el nombre de un recordatorio. El historial puede conservar títulos de tareas aunque elimines una tarea del listado.
 
 Conservación y aceptación
+Desde Inicio → Ajustes → Borrar mis datos puedes eliminar tu nombre, actividades, progreso, artículos y preferencias de este dispositivo. Se requiere una confirmación final escribiendo el nombre que le diste a Pomo; cancelar conserva la información. Al completar el borrado, POMO vuelve a la bienvenida. Esta opción no cambia los permisos que hayas concedido en Android.
 Desinstalar POMO puede eliminar los datos locales; POMO no ofrece recuperación desde una nube propia. Puedes leer este texto antes de decidir. Si estás de acuerdo, marca la casilla y pulsa Aceptar para continuar. Si no aceptas, puedes cerrar la aplicación.

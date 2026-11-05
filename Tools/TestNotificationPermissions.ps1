@@ -19,6 +19,12 @@ Get-ChildItem -LiteralPath $framework -Filter *.dll | Where-Object {
 $sources = @(
     'Tools/Tests/NotificationPermissionChecks.cs',
     'Tools/Tests/TaskDateChecks.cs',
+    'Tools/Tests/LocalDataResetChecks.cs',
+    'Tools/Tests/UserNameChecks.cs',
+    'Tools/Tests/WelcomeNameChecks.cs',
+    'Assets/Scripts/Presentation/Screens/NombreBienvenidaController.cs',
+    'Assets/Scripts/Data/Persistence/LocalDataResetService.cs',
+    'Assets/Scripts/Data/Persistence/LocalUserProfile.cs',
     'Assets/Scripts/ServicesAdapters/Notifications/NotificationService.cs',
     'Assets/Scripts/Business/Tasks/TaskService.cs',
     'Assets/Scripts/Data/Repositories/TaskRepository.cs',

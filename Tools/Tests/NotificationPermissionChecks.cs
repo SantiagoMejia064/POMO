@@ -90,14 +90,17 @@ internal static class NotificationPermissionChecks
         Check(adapter.ScheduleRhythmReminder(reminder, out _) == RhythmNotificationResult.Failed && AndroidNotificationCenter.Requests == 0, "Ritmo no fuerza permisos rechazados.");
         Reset(PermissionStatus.Denied);
         TaskDateChecks.Run(Check, Service);
-        Console.WriteLine("PASS: " + checks + " comprobaciones de permisos y fechas; Android simulado; archivos de prueba aislados en " + directory);
+        UserNameChecks.Run(Check);
+        WelcomeNameChecks.Run(Check);
+        LocalDataResetChecks.Run(Check);
+        Console.WriteLine("PASS: " + checks + " comprobaciones de permisos, fechas y borrado; Android simulado; archivos de prueba aislados en Logs/Sprint4");
         return 0;
     }
 }
 
 namespace UnityEngine
 {
-    public static class Debug { public static void Log(object value) { } public static void LogWarning(object value) { } }
+    public static class Debug { public static void Log(object value) { } public static void LogWarning(object value) { } public static void LogError(object value) { } }
     public static class Application { public static string persistentDataPath => Path.GetFullPath("Logs/Sprint4/permission-test-data"); }
     public static class JsonUtility
     {
@@ -109,6 +112,8 @@ namespace UnityEngine
     {
         private static readonly Dictionary<string, object> Values = new Dictionary<string, object>();
         public static void Clear() => Values.Clear();
+        public static bool HasKey(string key) => Values.ContainsKey(key);
+        public static void DeleteKey(string key) => Values.Remove(key);
         public static int GetInt(string key, int fallback = 0) => Values.TryGetValue(key, out var value) ? (int)value : fallback;
         public static string GetString(string key, string fallback = "") => Values.TryGetValue(key, out var value) ? (string)value : fallback;
         public static void SetInt(string key, int value) => Values[key] = value;
@@ -136,6 +141,7 @@ namespace Unity.Notifications.Android
         public static PermissionStatus UserPermissionToPost;
         public static bool UsingExactScheduling, ThrowSend, ThrowCancel;
         public static int Requests, Sends, ExactRequests;
+        public static int CancelAllCalls;
         private static readonly HashSet<int> Scheduled = new HashSet<int>();
         public static void Reset(PermissionStatus status) { UserPermissionToPost = status; UsingExactScheduling = ThrowSend = ThrowCancel = false; Requests = Sends = ExactRequests = 0; Scheduled.Clear(); }
         public static void RegisterNotificationChannel(AndroidNotificationChannel channel) { }
@@ -144,6 +150,7 @@ namespace Unity.Notifications.Android
         public static NotificationStatus CheckScheduledNotificationStatus(int id) => Scheduled.Contains(id) ? NotificationStatus.Scheduled : NotificationStatus.Unknown;
         public static void CancelScheduledNotification(int id) { if (ThrowCancel) throw new Exception("Android cancel failure"); Scheduled.Remove(id); }
         public static void CancelDisplayedNotification(int id) { if (ThrowCancel) throw new Exception("Android cancel failure"); }
+        public static void CancelAllNotifications() { if (ThrowCancel) throw new Exception("Android cancel failure"); CancelAllCalls++; Scheduled.Clear(); }
         public static void RequestExactScheduling() => ExactRequests++;
     }
 }

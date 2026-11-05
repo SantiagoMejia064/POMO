@@ -33,6 +33,8 @@ namespace Pomo.Presentation.Screens
         private int consentOriginalSiblingIndex;
         private Action returnFromReading;
 
+        [SerializeField] private NombreBienvenidaController nombreBienvenida;
+
         public bool HasAccepted => PlayerPrefs.GetInt(AcceptedVersionKey, 0) == NoticeVersion;
         public bool IsBlockingWelcome => consentPanel != null && consentPanel.activeInHierarchy;
 
@@ -86,6 +88,7 @@ namespace Pomo.Presentation.Screens
             PlayerPrefs.SetInt(AcceptedVersionKey, NoticeVersion);
             PlayerPrefs.Save();
             acceptedInCurrentOpening = true;
+            if (nombreBienvenida != null) nombreBienvenida.PrepararEntrada();
             ApplyGate(false);
         }
 

@@ -20,6 +20,16 @@ namespace Pomo.ServicesAdapters.Notifications
     {
         public const int NoNotificationId = -1;
 
+        // Explicit full reset only. Let native errors reach the reset UI so it
+        // cannot claim success while reminders containing old titles remain.
+        public void CancelAllForDataReset()
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            AndroidNotificationCenter.CancelAllNotifications();
+            permissionRequest = null;
+#endif
+        }
+
         private const int ReminderHour = 9;
         private const string TaskReminderChannelId = "pomo-task-reminders";
         private const string CycleReminderChannelId = "pomo-cycle-reminders";

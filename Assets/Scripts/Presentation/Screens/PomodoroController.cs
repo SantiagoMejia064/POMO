@@ -218,6 +218,20 @@ namespace Pomo.Presentation.Screens
             timer.Reset();
         }
 
+        /// <summary>Full data deletion discards work instead of persisting an interrupted session.</summary>
+        public void DiscardSessionForDataReset()
+        {
+            activeSessionId = null;
+            activeSessionTask = null;
+            activeFocusStartedAt = default;
+            intervalStartedAt = default;
+            intervalWorkedSeconds = 0;
+            focusIntervals.Clear();
+            LastFocusBlockCupsAwarded = 0;
+            cycleCompletionAudioSource?.Stop();
+            timer?.Reset();
+        }
+
         public void ToggleFavorite()
         {
             sessionService.ToggleFavorite();
