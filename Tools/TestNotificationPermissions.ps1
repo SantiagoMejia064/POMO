@@ -18,6 +18,7 @@ Get-ChildItem -LiteralPath $framework -Filter *.dll | Where-Object {
 } | ForEach-Object { $arguments += '/reference:"' + $_.FullName + '"' }
 $sources = @(
     'Tools/Tests/NotificationPermissionChecks.cs',
+    'Tools/Tests/TaskDateChecks.cs',
     'Assets/Scripts/ServicesAdapters/Notifications/NotificationService.cs',
     'Assets/Scripts/Business/Tasks/TaskService.cs',
     'Assets/Scripts/Data/Repositories/TaskRepository.cs',

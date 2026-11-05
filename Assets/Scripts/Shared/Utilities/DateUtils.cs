@@ -41,6 +41,13 @@ namespace Pomo.Shared.Utilities
                 return false;
             }
 
+            // Legacy date-only values use the same day/month order as the UI.
+            // Invariant TryParse would silently read 05/11/2026 as May 11.
+            if (TryParseUiDate(value, out date))
+            {
+                return true;
+            }
+
             if (DateTimeOffset.TryParse(
                     value,
                     CultureInfo.InvariantCulture,
@@ -50,8 +57,7 @@ namespace Pomo.Shared.Utilities
                 return true;
             }
 
-            // Supports the date-only values created before ISO storage was introduced.
-            return TryParseUiDate(value, out date);
+            return false;
         }
 
         public static bool TryNormalizeToIso(string value, out string isoDate)

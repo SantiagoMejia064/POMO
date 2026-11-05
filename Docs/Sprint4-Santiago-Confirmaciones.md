@@ -4,7 +4,7 @@ Estado: **En curso**. Primer recorrido corregido: borrar una tarea desde Calenda
 
 - El botón ahora solicita confirmación; la tarea solo se borra al aceptar.
 - Cancelar mantiene la tarea y el resumen de Calendario abiertos.
-- Se reutiliza el modal de Tareas. Si su sección está oculta, se muestra sobre el Canvas y se devuelve a su lugar al cerrar.
+- Se reutiliza el modal de Tareas. Siempre se muestra al frente sobre el Canvas, incluso si Tareas sigue activa detrás de Calendario; al cerrar restaura su posición, medidas y jerarquía.
 - Se recargan las tareas antes de solicitar y ejecutar el borrado.
 
 Archivo: `Assets/Scripts/Presentation/Screens/TasksScreenController.cs`.

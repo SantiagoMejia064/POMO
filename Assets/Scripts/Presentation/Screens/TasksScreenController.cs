@@ -96,6 +96,11 @@ namespace Pomo.Presentation.Screens
         private Action pendingDeleteAction;
         private Transform deleteConfirmationOriginalParent;
         private int deleteConfirmationOriginalSiblingIndex;
+        private Vector2 deleteConfirmationAnchorMin;
+        private Vector2 deleteConfirmationAnchorMax;
+        private Vector3 deleteConfirmationPosition;
+        private Vector2 deleteConfirmationSize;
+        private Vector3 deleteConfirmationScale;
         private bool taskDetailOpenedFromCalendar;
         private Action returnToBlockCreation;
 
@@ -433,9 +438,10 @@ namespace Pomo.Presentation.Screens
         {
             OpenCreateTaskForm();
 
-            if (dueDateInput != null && DateUtils.TryParseUiDate(dueDate, out _))
+            if (dueDateInput != null && DateUtils.TryParseUiDate(dueDate, out DateTimeOffset selectedDate))
             {
-                dueDateInput.text = DateUtils.FormatForUi(dueDate);
+                // This value already uses the UI format; do not parse it again as storage/ISO.
+                dueDateInput.text = selectedDate.ToString(DateUtils.UiDateFormat, System.Globalization.CultureInfo.InvariantCulture);
             }
         }
 
@@ -508,12 +514,20 @@ namespace Pomo.Presentation.Screens
             {
                 Transform panelTransform = deleteConfirmationPanel.transform;
                 Canvas canvas = deleteConfirmationPanel.GetComponentInParent<Canvas>(true);
-                if (panelTransform.parent != null && !panelTransform.parent.gameObject.activeInHierarchy &&
-                    canvas != null && canvas.rootCanvas.gameObject.activeInHierarchy)
+                if (panelTransform.parent != null && canvas != null && canvas.rootCanvas.gameObject.activeInHierarchy)
                 {
-                    // Calendar leaves the Tasks section hidden. Reuse its modal above both sections.
+                    // The Tasks section may still be active behind Calendar. Always
+                    // place the shared modal above both sections, not only when hidden.
                     deleteConfirmationOriginalParent = panelTransform.parent;
                     deleteConfirmationOriginalSiblingIndex = panelTransform.GetSiblingIndex();
+                    if (panelTransform is RectTransform rect)
+                    {
+                        deleteConfirmationAnchorMin = rect.anchorMin;
+                        deleteConfirmationAnchorMax = rect.anchorMax;
+                        deleteConfirmationPosition = rect.anchoredPosition3D;
+                        deleteConfirmationSize = rect.sizeDelta;
+                        deleteConfirmationScale = rect.localScale;
+                    }
                     panelTransform.SetParent(canvas.rootCanvas.transform, true);
                     panelTransform.SetAsLastSibling();
                 }
@@ -888,6 +902,14 @@ namespace Pomo.Presentation.Screens
                 {
                     deleteConfirmationPanel.transform.SetParent(deleteConfirmationOriginalParent, true);
                     deleteConfirmationPanel.transform.SetSiblingIndex(deleteConfirmationOriginalSiblingIndex);
+                    if (deleteConfirmationPanel.transform is RectTransform rect)
+                    {
+                        rect.anchorMin = deleteConfirmationAnchorMin;
+                        rect.anchorMax = deleteConfirmationAnchorMax;
+                        rect.anchoredPosition3D = deleteConfirmationPosition;
+                        rect.sizeDelta = deleteConfirmationSize;
+                        rect.localScale = deleteConfirmationScale;
+                    }
                 }
             }
             deleteConfirmationOriginalParent = null;

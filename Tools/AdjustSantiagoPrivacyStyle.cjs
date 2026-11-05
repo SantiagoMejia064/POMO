@@ -101,7 +101,7 @@ function buttonAncestor(go) {
 }
 let labels = 0, rounded = 0;
 // These lists use their original sprite dimensions to calculate card widths.
-const originalCardLists = new Set(['112485988', '873348477', '319139577', '330073916', '105291175']);
+const originalCardLists = new Set(['112485988', '873348477', '319139577', '330073916', '105291175', '853331057']);
 function belongsToCardList(go) {
     let transform = transformByGo.get(go);
     while (transform && transform !== '0') {

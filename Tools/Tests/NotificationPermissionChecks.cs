@@ -88,7 +88,9 @@ internal static class NotificationPermissionChecks
         Reset(PermissionStatus.NotificationsBlockedForApp);
         Check(adapter.PermissionState == NotificationAccessState.Denied, "Bloqueo de Android se trata como rechazo.");
         Check(adapter.ScheduleRhythmReminder(reminder, out _) == RhythmNotificationResult.Failed && AndroidNotificationCenter.Requests == 0, "Ritmo no fuerza permisos rechazados.");
-        Console.WriteLine("PASS: " + checks + " comprobaciones; Android simulado; archivos de prueba aislados en " + directory);
+        Reset(PermissionStatus.Denied);
+        TaskDateChecks.Run(Check, Service);
+        Console.WriteLine("PASS: " + checks + " comprobaciones de permisos y fechas; Android simulado; archivos de prueba aislados en " + directory);
         return 0;
     }
 }

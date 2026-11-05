@@ -655,8 +655,11 @@ namespace Pomo.Presentation.Screens
             dateCells.Add(cell.gameObject);
             float left = (float)column / columns;
             float right = (float)(column + 1) / columns;
-            float top = 1f - (float)row / rows;
-            float bottom = 1f - (float)(row + 1) / rows;
+            // A week keeps the same day-cell height as a month. One row must
+            // not stretch its task buttons across the entire calendar.
+            int layoutRows = mode == CalendarMode.Week ? 6 : rows;
+            float top = 1f - (float)row / layoutRows;
+            float bottom = 1f - (float)(row + 1) / layoutRows;
             Anchor(cell, new Vector2(left, bottom), new Vector2(right, top));
             cell.offsetMin = new Vector2(2f, 2f);
             cell.offsetMax = new Vector2(-2f, -2f);
@@ -692,9 +695,12 @@ namespace Pomo.Presentation.Screens
                 Button taskButton = taskRect.gameObject.AddComponent<Button>();
                 taskButton.targetGraphic = taskImage;
                 taskButton.onClick.AddListener(() => OpenTask(task.id));
-                CreateText("Task Title", taskRect, new Vector2(0.06f, 0.05f), new Vector2(0.94f, 0.95f),
-                    ShortTitle(task.title), mode == CalendarMode.Day ? 14 : 10,
+                TMP_Text taskLabel = CreateText("Task Title", taskRect, new Vector2(0.06f, 0.05f), new Vector2(0.94f, 0.95f),
+                    ShortTitle(task.title), mode == CalendarMode.Day ? 40 : 24,
                     Color.white, TextAlignmentOptions.MidlineLeft);
+                taskLabel.richText = false;
+                taskLabel.textWrappingMode = TextWrappingModes.NoWrap;
+                taskLabel.overflowMode = TextOverflowModes.Ellipsis;
             }
 
             int displayedReminders = Math.Min(dayReminders.Count, visibleTaskCount - displayedCount);
@@ -719,7 +725,7 @@ namespace Pomo.Presentation.Screens
                 });
                 TMP_Text reminderLabel = CreateText("Reminder Name", reminderRect,
                     new Vector2(0.06f, 0.05f), new Vector2(0.94f, 0.95f),
-                    dayReminders[i].name, mode == CalendarMode.Day ? 14 : 10,
+                    dayReminders[i].name, mode == CalendarMode.Day ? 40 : 24,
                     Color.white, TextAlignmentOptions.MidlineLeft);
                 reminderLabel.textWrappingMode = TextWrappingModes.NoWrap;
                 reminderLabel.richText = false;
@@ -734,7 +740,7 @@ namespace Pomo.Presentation.Screens
                 float taskTop = 0.74f - shownCount * rowHeight;
                 CreateText("More Tasks", cell,
                     new Vector2(0.06f, taskTop - rowHeight), new Vector2(0.94f, taskTop),
-                    "+" + (totalCount - shownCount) + " más", 10, Color.white,
+                    "+" + (totalCount - shownCount) + " más", mode == CalendarMode.Day ? 32 : 22, Color.white,
                     TextAlignmentOptions.MidlineLeft);
             }
         }
@@ -842,7 +848,7 @@ namespace Pomo.Presentation.Screens
             }
 
             string month = displayedDate.ToString("MMMM yyyy", new CultureInfo("es-CO"));
-            monthLabel.text = month.ToUpper(new CultureInfo("es-CO")) + "  ▾  " + ModeLabel();
+            monthLabel.text = month.ToUpper(new CultureInfo("es-CO")) + "  -  " + ModeLabel();
         }
 
         private void WireRuntimeButtons()
