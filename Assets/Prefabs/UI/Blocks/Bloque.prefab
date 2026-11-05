@@ -139,6 +139,8 @@ MonoBehaviour:
   taskText: {fileID: 0}
   durationText: {fileID: 470230617021218478}
   favoriteText: {fileID: 0}
+  favoriteOnSprite: {fileID: 21300000, guid: cac08487c9d499c44aa3c486a6878e62, type: 3}
+  favoriteOffSprite: {fileID: 21300000, guid: 13e7dcf0b24c9a54a8d12f1bc7535aea, type: 3}
   selectionButton: {fileID: 4091845018493341792}
 --- !u!1 &7853391350318315645
 GameObject:

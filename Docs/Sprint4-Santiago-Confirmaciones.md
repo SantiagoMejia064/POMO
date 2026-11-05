@@ -1,23 +1,22 @@
-# POMO-338 / S4-T36 — Confirmaciones
+# POMO-337 / 338 / 339 — Confirmación y cancelación
 
-Estado: **En curso**. Primer recorrido corregido: borrar una tarea desde Calendario.
+Revisión realizada en código, escena y Play de Santiago. No se borraron datos del usuario.
 
-- El botón ahora solicita confirmación; la tarea solo se borra al aceptar.
-- Cancelar mantiene la tarea y el resumen de Calendario abiertos.
-- Se reutiliza el modal de Tareas. Siempre se muestra al frente sobre el Canvas, incluso si Tareas sigue activa detrás de Calendario; al cerrar restaura su posición, medidas y jerarquía.
-- Se recargan las tareas antes de solicitar y ejecutar el borrado.
+| Recorrido | Resultado observado en Play |
+|---|---|
+| Tareas → eliminar → cancelar | La tarea permanece en la lista. |
+| Editar → cerrar → volver | Conserva el cambio temporal en el formulario. |
+| Editar → cerrar → cerrar sin guardar | Descarta el cambio temporal y conserva el título original guardado. |
+| Calendario → tarea → eliminar → cancelar | Confirmación al frente; vuelve al resumen con la tarea intacta. |
+| Calendario → recordatorio → borrar → conservar | Mantiene el recordatorio y restablece los controles. |
+| Ajustes → borrar datos → cancelar | Regresa a Ajustes sin borrar. |
+| Ajustes → borrar datos → continuar → cancelar | También conserva los datos desde el segundo paso. |
+| Aviso de privacidad desde Ajustes → volver | Regresa a Ajustes, sin reiniciar bienvenida. |
 
-Archivo: `Assets/Scripts/Presentation/Screens/TasksScreenController.cs`.
-Validación ejecutada: compilación C# con referencias de Unity, sin errores; advertencias existentes.
-No se modificaron escenas ni el almacenamiento del usuario.
+Los cinco JSON se compararon por SHA-256 antes y después: **idénticos**. Los avisos bloquearon los botones de fondo en los recorridos comprobados.
 
-## Comprobar en Play de Santiago
+**337:** revisión completada. **338:** confirmaciones existentes y reutilización del modal de Tareas comprobadas; no hicieron falta modales nuevos. **339:** cancelación comprobada en Play y guardado/eliminación comprobados con servicios reales y archivos aislados. La comprobación final del clic de confirmar debe hacerse con una tarea de prueba.
 
-1. Calendario → tarea → eliminar: debe aparecer el modal sin borrar todavía.
-2. Cancelar: conservar tarea y resumen; volver a solicitar y aceptar: eliminar y refrescar Calendario.
-3. Volver a solicitar y cancelar varias veces: no acumular acciones ni borrar al confirmar otro flujo.
-4. Repetir eliminación desde Tareas: conservar su comportamiento anterior.
+ConfirmDelete limpia la acción pendiente antes de ejecutarla; cancelar la descarta. El modal compartido restaura jerarquía y medidas al cerrarse. Guardar en el resumen de Calendario solo cierra el resumen; la edición real está en Tareas.
 
-El usuario confirmó que las confirmaciones necesarias funcionan como deberían.
-Validación comunicada por Santiago; no se presenta como una prueba ejecutada por el agente.
-El recorrido de Calendario corregido queda validado por el usuario. Esta nota no sustituye evidencias de otros recorridos ni cambia Jira automáticamente.
+Recorrido final y límites: Docs/Sprint4-Santiago-Regresion.md. No se modificaron estados de Jira.

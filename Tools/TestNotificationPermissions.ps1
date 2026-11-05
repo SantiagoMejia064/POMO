@@ -22,6 +22,7 @@ $sources = @(
     'Tools/Tests/LocalDataResetChecks.cs',
     'Tools/Tests/UserNameChecks.cs',
     'Tools/Tests/WelcomeNameChecks.cs',
+    'Tools/Tests/Sprint4DataChecks.cs',
     'Assets/Scripts/Presentation/Screens/NombreBienvenidaController.cs',
     'Assets/Scripts/Data/Persistence/LocalDataResetService.cs',
     'Assets/Scripts/Data/Persistence/LocalUserProfile.cs',
@@ -38,6 +39,13 @@ $sources = @(
     'Assets/Scripts/Shared/Enums/TaskValidationResult.cs',
     'Assets/Scripts/Shared/Enums/TaskStatusTransitionResult.cs'
 )
+$sources += Get-ChildItem -LiteralPath (Join-Path $projectRoot 'Assets/Scripts/Data') -Filter *.cs -Recurse |
+    Where-Object { $_.Name -notin @('StoreCatalog.cs','StoreItemDefinition.cs') } |
+    ForEach-Object { [IO.Path]::GetRelativePath($projectRoot,$_.FullName).Replace('\','/') }
+$sources += Get-ChildItem -LiteralPath (Join-Path $projectRoot 'Assets/Scripts/Shared/Enums') -Filter *.cs |
+    ForEach-Object { [IO.Path]::GetRelativePath($projectRoot,$_.FullName).Replace('\','/') }
+$sources += @('Assets/Scripts/Business/Pomodoro/PomodoroService.cs','Assets/Scripts/Business/Progress/RhythmReminderService.cs')
+$sources = $sources | Select-Object -Unique
 foreach ($source in $sources) { $arguments += '"' + (Join-Path $projectRoot $source) + '"' }
 $responsePath = Join-Path $output 'permission-tests.rsp'
 [IO.File]::WriteAllLines($responsePath, $arguments)

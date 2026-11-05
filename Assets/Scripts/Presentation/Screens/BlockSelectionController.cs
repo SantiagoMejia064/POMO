@@ -30,6 +30,9 @@ namespace Pomo.Presentation.Screens
         [Header("Bloques favoritos")]
         [SerializeField] private Transform favoriteContent;
         [SerializeField] private WorkBlockItemView favoriteItemPrefab;
+        [Header("Tipografía de las listas")]
+        [SerializeField] private TMP_FontAsset fuenteTitulos;
+        [SerializeField] private TMP_FontAsset fuenteContenido;
         [SerializeField] private GameObject[] legacyFavoriteCards;
 
         [Header("Paneles existentes")]
@@ -209,7 +212,9 @@ namespace Pomo.Presentation.Screens
                     () => ToggleFavorite(block.id));
                 item.SetSelected(pomodoroController.SelectedBlock != null &&
                     pomodoroController.SelectedBlock.id == block.id);
+                item.ApplyTypography(fuenteTitulos, fuenteContenido);
             }
+            AlignListAtTop(favoriteContent);
         }
 
         public void ContinueToTimer()
@@ -334,6 +339,7 @@ namespace Pomo.Presentation.Screens
 
                 BlockTaskSelectionItemView item = Instantiate(taskItemPrefab, taskContent);
                 item.Bind(task.title, () => SelectTask(task.id, item));
+                item.ApplyTypography(fuenteTitulos);
                 item.SetSelected(pomodoroController.SelectedTask != null &&
                     pomodoroController.SelectedTask.id == task.id);
                 taskItems.Add(item);
@@ -343,10 +349,10 @@ namespace Pomo.Presentation.Screens
             {
                 WorkBlockItemView newTaskItem = Instantiate(newTaskItemPrefab, taskContent);
                 newTaskItem.BindTitleOnly("Nueva tarea", RequestNewMission);
+                newTaskItem.ApplyTypography(fuenteTitulos, fuenteContenido);
             }
 
-            ScrollRect taskScroll = taskContent.GetComponentInParent<ScrollRect>(true);
-            if (taskScroll != null) taskScroll.verticalNormalizedPosition = 1f;
+            AlignListAtTop(taskContent);
         }
 
         private void RefreshDurationList()
@@ -381,7 +387,9 @@ namespace Pomo.Presentation.Screens
                 item.SetSelected(pomodoroController.SelectedBlock != null &&
                     pomodoroController.SelectedBlock.id == block.id);
                 durationItems.Add(item);
+                item.ApplyTypography(fuenteTitulos, fuenteContenido);
             }
+            AlignListAtTop(durationContent);
         }
 
         private void SelectTask(string taskId, BlockTaskSelectionItemView selectedItem)
@@ -512,8 +520,21 @@ namespace Pomo.Presentation.Screens
         {
             for (int index = content.childCount - 1; index >= 0; index--)
             {
-                Destroy(content.GetChild(index).gameObject);
+                GameObject child = content.GetChild(index).gameObject;
+                child.SetActive(false); // Exclude old rows from layout before deferred destruction.
+                Destroy(child);
             }
+        }
+
+        private static void AlignListAtTop(Transform content)
+        {
+            ScrollRect scroll = content.GetComponentInParent<ScrollRect>(true);
+            if (scroll == null) return;
+            scroll.horizontal = false;
+            scroll.StopMovement();
+            Canvas.ForceUpdateCanvases();
+            if (content is RectTransform rect) LayoutRebuilder.ForceRebuildLayoutImmediate(rect);
+            scroll.verticalNormalizedPosition = 1f;
         }
 
         private void ShowSelectionRequiredMessage(bool shouldShow)
@@ -645,11 +666,13 @@ namespace Pomo.Presentation.Screens
                 layoutGroup = favoriteContent.gameObject.AddComponent<VerticalLayoutGroup>();
             }
 
-            layoutGroup.spacing = 10f;
+            layoutGroup.spacing = 16f;
+            layoutGroup.padding = new RectOffset(20, 20, 24, 24);
             layoutGroup.childAlignment = TextAnchor.UpperCenter;
             layoutGroup.childControlWidth = true;
             layoutGroup.childControlHeight = true;
-            layoutGroup.childForceExpandWidth = false;
+            layoutGroup.childForceExpandWidth = true;
+            layoutGroup.childScaleWidth = false;
             layoutGroup.childForceExpandHeight = false;
 
             ContentSizeFitter contentSizeFitter = favoriteContent.GetComponent<ContentSizeFitter>();

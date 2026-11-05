@@ -93,6 +93,7 @@ internal static class NotificationPermissionChecks
         UserNameChecks.Run(Check);
         WelcomeNameChecks.Run(Check);
         LocalDataResetChecks.Run(Check);
+        Sprint4DataChecks.Run(Check);
         Console.WriteLine("PASS: " + checks + " comprobaciones de permisos, fechas y borrado; Android simulado; archivos de prueba aislados en Logs/Sprint4");
         return 0;
     }

@@ -61,8 +61,33 @@ namespace Pomo.Presentation.Screens
                 layoutElement = gameObject.AddComponent<LayoutElement>();
             }
 
-            layoutElement.minHeight = 100f;
-            layoutElement.preferredHeight = 100f;
+            layoutElement.minHeight = 140f;
+            layoutElement.preferredHeight = 140f;
+            layoutElement.flexibleHeight = 0f;
+            layoutElement.minWidth = 0f;
+            layoutElement.flexibleWidth = 1f;
+            if (titleText == null) return;
+            // The original prefab label was taller than the compact row and
+            // intercepted taps intended for the neighbouring row.
+            titleText.raycastTarget = false;
+            titleText.rectTransform.anchorMin = Vector2.zero;
+            titleText.rectTransform.anchorMax = Vector2.one;
+            titleText.rectTransform.offsetMin = new Vector2(24f, 12f);
+            titleText.rectTransform.offsetMax = new Vector2(-24f, -12f);
+            titleText.enableAutoSizing = true;
+            titleText.fontSizeMin = 28f;
+            titleText.fontSizeMax = 48f;
+            titleText.textWrappingMode = TextWrappingModes.Normal;
+            titleText.overflowMode = TextOverflowModes.Ellipsis;
+            titleText.alignment = TextAlignmentOptions.MidlineLeft;
+        }
+
+        public void ApplyTypography(TMP_FontAsset font)
+        {
+            if (titleText == null || font == null) return;
+            titleText.font = font;
+            titleText.fontSharedMaterial = font.material;
+            titleText.color = Color.white;
         }
     }
 }

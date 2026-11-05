@@ -14,11 +14,13 @@ namespace Pomo.Presentation.Screens
         [SerializeField] private TMP_Text favoriteText;
         [SerializeField] private Button selectionButton;
         [SerializeField] private Button favoriteToggleButton;
+        [SerializeField] private Sprite favoriteOnSprite;
+        [SerializeField] private Sprite favoriteOffSprite;
+        private Image favoriteIcon;
 
         [SerializeField] private Image backgroundImage;
 
         private static readonly Color SelectedColor = new Color(0.15f, 0.72f, 0.57f, 1f);
-        private static readonly Color FavoriteColor = new Color32(232, 177, 128, 255);
         private Color normalColor;
         private bool hasNormalColor;
         private bool hasReservedFavoriteSpace;
@@ -49,7 +51,7 @@ namespace Pomo.Presentation.Screens
                 durationText.text = $"{focusMinutes} min trabajo · {breakMinutes} min descanso";
                 durationText.fontSize = 20f;
             }
-            if (favoriteText != null) favoriteText.text = isFavorite ? "★" : "☆";
+            if (favoriteText != null) favoriteText.text = string.Empty;
 
             if (selectionButton == null)
             {
@@ -57,7 +59,7 @@ namespace Pomo.Presentation.Screens
             }
 
             CacheBackground();
-            EnsureCompactHeight();
+            EnsureCompactHeight(false, onFavoriteToggle != null);
             ConfigureFavoriteToggle(isFavorite, onFavoriteToggle);
             SetSelected(false);
             selectionButton.onClick.RemoveAllListeners();
@@ -82,7 +84,7 @@ namespace Pomo.Presentation.Screens
             }
 
             CacheBackground();
-            EnsureCompactHeight();
+            EnsureCompactHeight(true, false);
             SetSelected(false);
             selectionButton.onClick.RemoveAllListeners();
             selectionButton.onClick.AddListener(() => onSelected?.Invoke());
@@ -110,7 +112,7 @@ namespace Pomo.Presentation.Screens
             }
         }
 
-        private void EnsureCompactHeight()
+        private void EnsureCompactHeight(bool titleOnly, bool reserveFavorite)
         {
             LayoutElement layoutElement = GetComponent<LayoutElement>();
             if (layoutElement == null)
@@ -118,8 +120,47 @@ namespace Pomo.Presentation.Screens
                 layoutElement = gameObject.AddComponent<LayoutElement>();
             }
 
-            layoutElement.minHeight = 128f;
-            layoutElement.preferredHeight = 128f;
+            bool hasTask = taskText != null && !string.IsNullOrWhiteSpace(taskText.text);
+            layoutElement.minHeight = hasTask ? 220f : 160f;
+            layoutElement.preferredHeight = layoutElement.minHeight;
+            layoutElement.flexibleHeight = 0f;
+            layoutElement.minWidth = 0f;
+            layoutElement.flexibleWidth = 1f;
+            float right = reserveFavorite ? 112f : 24f;
+            FitLabel(nameText, titleOnly ? 0f : hasTask ? .66f : .46f, 1f, right, 46f);
+            FitLabel(taskText, .33f, .66f, right, 30f);
+            FitLabel(durationText, 0f, hasTask ? .33f : .46f, right, 30f);
+        }
+
+        private static void FitLabel(TMP_Text text, float bottom, float top, float right, float size)
+        {
+            if (text == null) return;
+            text.raycastTarget = false;
+            text.rectTransform.anchorMin = new Vector2(0f, bottom);
+            text.rectTransform.anchorMax = new Vector2(1f, top);
+            text.rectTransform.offsetMin = new Vector2(24f, 6f);
+            text.rectTransform.offsetMax = new Vector2(-right, -6f);
+            text.enableAutoSizing = true;
+            text.fontSizeMin = size * .8f;
+            text.fontSizeMax = size;
+            text.textWrappingMode = TextWrappingModes.Normal;
+            text.overflowMode = TextOverflowModes.Ellipsis;
+            text.alignment = TextAlignmentOptions.MidlineLeft;
+        }
+
+        public void ApplyTypography(TMP_FontAsset titleFont, TMP_FontAsset bodyFont)
+        {
+            ApplyFont(nameText, titleFont);
+            ApplyFont(taskText, bodyFont);
+            ApplyFont(durationText, bodyFont);
+        }
+
+        private static void ApplyFont(TMP_Text text, TMP_FontAsset font)
+        {
+            if (text == null || font == null) return;
+            text.font = font;
+            text.fontSharedMaterial = font.material;
+            text.color = Color.white;
         }
 
         private void ConfigureFavoriteToggle(bool isFavorite, Action onFavoriteToggle)
@@ -136,8 +177,22 @@ namespace Pomo.Presentation.Screens
 
             EnsureFavoriteToggleButton();
             favoriteToggleButton.gameObject.SetActive(true);
-            favoriteText.text = isFavorite ? "★" : "☆";
-            favoriteText.color = FavoriteColor;
+            favoriteText.text = string.Empty;
+            favoriteText.raycastTarget = false;
+            if (favoriteIcon == null)
+            {
+                var icon = new GameObject("Estrella de favorito", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+                icon.transform.SetParent(favoriteText.transform, false);
+                favoriteIcon = icon.GetComponent<Image>();
+                favoriteIcon.rectTransform.anchorMin = Vector2.zero;
+                favoriteIcon.rectTransform.anchorMax = Vector2.one;
+                favoriteIcon.rectTransform.offsetMin = new Vector2(10f, 10f);
+                favoriteIcon.rectTransform.offsetMax = new Vector2(-10f, -10f);
+                favoriteIcon.preserveAspect = true;
+            }
+            favoriteIcon.sprite = isFavorite ? favoriteOnSprite : favoriteOffSprite;
+            favoriteIcon.color = Color.white;
+            favoriteToggleButton.targetGraphic = favoriteIcon;
             favoriteToggleButton.onClick.RemoveAllListeners();
             favoriteToggleButton.onClick.AddListener(() => onFavoriteToggle());
         }

@@ -40,6 +40,12 @@ namespace Pomo.Presentation.Screens
             SetPanelStates(true, false, false, false, true, false);
         }
 
+        public void OpenDayFromSummary(int dayIndex)
+        {
+            OpenDailyProgress();
+            dailyProgressView?.SelectDayOfCurrentWeek(dayIndex);
+        }
+
         public void ReturnToProgressSelection()
         {
             SetPanelStates(true, true, false, false, false, false);
