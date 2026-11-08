@@ -1,7 +1,6 @@
 using System;
 using Pomo.Business.Pomo;
 using Pomo.Data.Persistence;
-using Pomo.ServicesAdapters.Audio;
 using Pomo.ServicesAdapters.Notifications;
 using TMPro;
 using UnityEngine;
@@ -145,7 +144,6 @@ namespace Pomo.Presentation.Screens
         {
             foreach (string key in LocalDataResetService.PreferenceKeys) PlayerPrefs.DeleteKey(key);
             PlayerPrefs.Save();
-            new AudioService().SetEnabled(true);
             PomoReactionService.ResetForNewSession();
         }
 

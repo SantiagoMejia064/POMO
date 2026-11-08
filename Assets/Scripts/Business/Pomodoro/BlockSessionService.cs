@@ -100,17 +100,13 @@ namespace Pomo.Business.Pomodoro
                 name,
                 SelectedBlock.focusMinutes,
                 SelectedBlock.breakMinutes,
-                SelectedTask.id);
+                SelectedTask.id, isFavorite: true);
 
             if (createdBlock == null)
             {
                 return false;
             }
 
-            // The "Mis bloques favoritos" list is the user's saved-block list.
-            // A block saved from this flow must appear there immediately.
-            pomodoroService.SetFavorite(createdBlock.id, true);
-            createdBlock.isFavorite = true;
             SelectedBlock = createdBlock;
             savedBlock = createdBlock;
             return true;

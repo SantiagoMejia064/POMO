@@ -184,13 +184,15 @@ namespace Pomo.Business.Progress
             return progressRepository.GetRecordedStudySessions();
         }
 
-        public DailyProgressModel RecordFocusSession(CompletedFocusBlockModel session)
+        public DailyProgressModel RecordFocusSession(CompletedFocusBlockModel session, int completionCups = 0)
         {
-            if (!progressRepository.TryRecordFocusSession(session, out DailyProgressModel day)) return null;
+            if (!progressRepository.TryRecordFocusSession(session, out DailyProgressModel day, completionCups)) return null;
             // Solo el primer guardado de una sesión completada publica el logro.
             // Las sesiones interrumpidas siguen actualizando las métricas existentes.
             PomoReactionService.NotifyFocusBlockCompleted(session);
             StudySessionsChanged?.Invoke();
+            if (!session.interrupted && completionCups > 0)
+                CupsBalanceChanged?.Invoke(GetCupsBalance());
             return day;
         }
 

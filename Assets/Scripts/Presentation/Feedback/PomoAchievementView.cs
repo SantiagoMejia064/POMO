@@ -1,4 +1,5 @@
 using Pomo.Presentation.Screens;
+using Pomo.Presentation.UI;
 using Pomo.Shared.Enums;
 using Pomo.Shared.Events;
 using TMPro;
@@ -71,6 +72,7 @@ namespace Pomo.Presentation.Feedback
             pomoVisual?.SetPaused(false);
             pomoVisual?.ShowAchievement(achievement.Kind);
             ApplyVisibility(true);
+            PomoScreenReader.Announce(message);
             return Mathf.Max(minimumDisplaySeconds, pomoVisual != null ? pomoVisual.ReactionDuration : 0f);
         }
 

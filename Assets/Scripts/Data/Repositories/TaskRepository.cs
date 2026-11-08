@@ -101,8 +101,6 @@ namespace Pomo.Data.Repositories
 
         private void NormalizeStoredDates()
         {
-            bool hasChanges = false;
-
             foreach (TaskModel task in storedTasks.tasks)
             {
                 if (task == null ||
@@ -113,18 +111,13 @@ namespace Pomo.Data.Repositories
                 }
 
                 task.dueDate = isoDate;
-                hasChanges = true;
-            }
-
-            if (hasChanges)
-            {
-                SaveChanges();
             }
         }
 
         private void SaveChanges()
         {
-            storageService.Save(storedTasks);
+            try { storageService.Save(storedTasks); }
+            catch (LocalDataWriteException) { Reload(); throw; }
         }
     }
 }

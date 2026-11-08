@@ -3,6 +3,7 @@ using System.IO;
 using Pomo.Business.Pomodoro;
 using Pomo.Business.Progress;
 using Pomo.Business.Tasks;
+using Pomo.Data.DTOs;
 using Pomo.Data.Models;
 using Pomo.Data.Persistence;
 using Pomo.Data.Repositories;
@@ -69,5 +70,50 @@ internal static class Sprint4DataChecks
         foreach (var favorite in defaults.GetFavoriteBlocks())
             check(!favorite.isCustom&&string.IsNullOrEmpty(favorite.taskId),"Los favoritos predeterminados no contienen datos de tareas ni bloques personales.");
         check(new RhythmReminderService(new RhythmReminderRepository(Storage("rhythm-reminders.json"))).GetCalendarReminders().Count==0,"Después del borrado no reaparecen recordatorios.");
+
+        CheckStorageRecovery(root, check);
+        var awarded = new CompletedFocusBlockModel
+        {
+            sessionId = "con-premio", sessionDate = "2026-11-05", workedSeconds = 60
+        };
+        check(Progress().TryRecordFocusSession(awarded, out _, 20) &&
+              !Progress().TryRecordFocusSession(awarded, out _, 20) &&
+              Progress().GetCupsBalance() == 20, "Bloque y premio se guardan juntos una sola vez.");
+    }
+
+    private static void CheckStorageRecovery(string root, Action<bool, string> check)
+    {
+        JsonStorageService.ClearNotices();
+        string path = Path.Combine(root, "tasks.json");
+        var storage = new JsonStorageService(path);
+        check(!storage.TryLoad<TaskDTO>(out _) && !JsonStorageService.TryTakeNotice(out _),
+            "Una instalación sin datos se abre sin aviso de corrupción.");
+        storage.Save(new TaskDTO { tasks = { new TaskModel { id = "primera", title = "Anterior" } } });
+        storage.Save(new TaskDTO { tasks = { new TaskModel { id = "primera", title = "Actual" } } });
+        string healthy = File.ReadAllText(path);
+        using (var locked = new FileStream(path + ".tmp", FileMode.Create, FileAccess.ReadWrite, FileShare.None))
+        {
+            var tasks = new TaskService(new TaskRepository(storage));
+            check(tasks.CreateTask("No se guardó", "", "Materia", "23/11/2026") == null &&
+                  tasks.GetStoredTasks().Count == 1 && File.ReadAllText(path) == healthy,
+                "Un fallo de escritura conserva el archivo y no confirma una tarea nueva.");
+        }
+        check(JsonStorageService.TryTakeNotice(out string writeNotice) && writeNotice.Contains("No se guardaron"),
+            "El guardado fallido produce un aviso.");
+        File.WriteAllText(path, "{\"tasks\": corrupto}");
+        check(storage.TryLoad(out TaskDTO recovered) && recovered.tasks[0].title == "Anterior" &&
+              new JsonStorageService(path).TryLoad(out TaskDTO reopened) && reopened.tasks[0].title == "Anterior",
+            "Se restaura el respaldo y una instancia nueva lee la versión recuperada.");
+        check(JsonStorageService.TryTakeNotice(out string recoveredNotice) && recoveredNotice.Contains("Se recuperó"),
+            "La recuperación produce un aviso distinto del fallo.");
+
+        File.WriteAllText(path, "daño principal");
+        File.WriteAllText(path + ".bak", "daño respaldo");
+        check(!storage.TryLoad<TaskDTO>(out _) && JsonStorageService.TryTakeNotice(out string lostNotice) &&
+              lostNotice.Contains("no se sobrescribirán"), "Dos copias dañadas producen un aviso de recuperación fallida.");
+        bool rejected = false;
+        try { storage.Save(new TaskDTO()); } catch (LocalDataWriteException) { rejected = true; }
+        check(rejected && File.ReadAllText(path) == "daño principal" &&
+              File.ReadAllText(path + ".bak") == "daño respaldo", "Un nuevo guardado conserva las copias dañadas.");
     }
 }

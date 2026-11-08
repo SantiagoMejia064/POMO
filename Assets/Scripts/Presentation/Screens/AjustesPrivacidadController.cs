@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using TMPro;
 using Pomo.Business.Tasks;
 using Pomo.Data.Models;
+using Pomo.ServicesAdapters.Vibration;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -20,6 +21,8 @@ namespace Pomo.Presentation.Screens
         [SerializeField] private NotificationPermissionController permisosNotificaciones;
         [SerializeField] private Button botonNotificaciones;
         [SerializeField] private TMP_Text estadoNotificaciones;
+        [SerializeField] private Button botonVibracion;
+        [SerializeField] private TMP_Text estadoVibracion;
 
         private void Awake()
         {
@@ -27,6 +30,20 @@ namespace Pomo.Presentation.Screens
             botonLeerAviso.onClick.AddListener(ConsultarAviso);
             botonVolver.onClick.AddListener(VolverAInicio);
             if (botonNotificaciones != null) botonNotificaciones.onClick.AddListener(ConsultarPermisos);
+            if (botonVibracion != null) botonVibracion.onClick.AddListener(CambiarVibracion);
+            MostrarEstadoVibracion();
+        }
+
+        private void CambiarVibracion()
+        {
+            VibrationService.Enabled = !VibrationService.Enabled;
+            MostrarEstadoVibracion();
+        }
+
+        private void MostrarEstadoVibracion()
+        {
+            if (estadoVibracion != null)
+                estadoVibracion.text = VibrationService.Enabled ? "Vibración activada" : "Vibración desactivada";
         }
 
         public void AbrirAjustes()
@@ -76,6 +93,7 @@ namespace Pomo.Presentation.Screens
             if (botonLeerAviso != null) botonLeerAviso.onClick.RemoveListener(ConsultarAviso);
             if (botonVolver != null) botonVolver.onClick.RemoveListener(VolverAInicio);
             if (botonNotificaciones != null) botonNotificaciones.onClick.RemoveListener(ConsultarPermisos);
+            if (botonVibracion != null) botonVibracion.onClick.RemoveListener(CambiarVibracion);
         }
     }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using Pomo.Data.Models;
 using Pomo.Data.Persistence;
+using Pomo.Shared.Constants;
 using UnityEngine;
 
 namespace Pomo.Data.Repositories
@@ -12,7 +13,7 @@ namespace Pomo.Data.Repositories
         private readonly JsonStorageService storage;
         public RhythmReminderRepository(JsonStorageService storage = null)
         {
-            this.storage = storage ?? new JsonStorageService(Path.Combine(Application.persistentDataPath, "rhythm-reminders.json"));
+            this.storage = storage ?? new JsonStorageService(Path.Combine(Application.persistentDataPath, AppConstants.RhythmRemindersFileName));
         }
 
         public List<RhythmReminderModel> GetAll()

@@ -11,10 +11,11 @@ namespace Pomo.Data.Persistence
         private static readonly string[] FileNames = {
             AppConstants.TasksFileName, AppConstants.WorkBlocksFileName,
             AppConstants.ProgressFileName, AppConstants.StoreInventoryFileName,
-            "rhythm-reminders.json"
+            AppConstants.RhythmRemindersFileName
         };
         public static readonly IReadOnlyList<string> PreferenceKeys = Array.AsReadOnly(new[] {
-            "Pomo_AudioEnabled", "pomo.deleted-tasks.date", "pomo.deleted-tasks.count",
+            AppConstants.AudioPreferenceKey, AppConstants.VibrationPreferenceKey,
+            "pomo.deleted-tasks.date", "pomo.deleted-tasks.count",
             "pomo.privacy.accepted-version", LocalUserProfile.NameKey
         });
         private readonly string directory;
@@ -35,6 +36,7 @@ namespace Pomo.Data.Persistence
             {
                 yield return Path.Combine(directory, name);
                 yield return Path.Combine(directory, name + ".tmp");
+                yield return Path.Combine(directory, name + ".bak");
             }
         }
 
@@ -52,6 +54,7 @@ namespace Pomo.Data.Persistence
             clearPreferences();
             foreach (string path in Paths())
                 if (File.Exists(path)) throw new IOException("No se pudo eliminar " + Path.GetFileName(path));
+            JsonStorageService.ClearNotices();
         }
     }
 }

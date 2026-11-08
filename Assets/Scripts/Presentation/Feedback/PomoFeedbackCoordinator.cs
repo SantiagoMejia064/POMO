@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Pomo.Business.Pomo;
+using Pomo.Shared.Enums;
 using Pomo.Shared.Events;
 using UnityEngine;
 
@@ -30,6 +31,7 @@ namespace Pomo.Presentation.Feedback
         public int ReceivedCount => receivedKeys.Count;
         public PomoAchievement CurrentAchievement => current;
         public bool IsSuppressed { get; private set; }
+        public static bool CanPresentBlock => activeInstance != null && !activeInstance.HasSuppressedPanel();
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetRuntimeSession()
@@ -96,6 +98,9 @@ namespace Pomo.Presentation.Feedback
 
         private void Enqueue(PomoAchievement achievement)
         {
+            // A focus phase ending while Memoria is open uses the immediate
+            // in-app notice instead of showing the same event again later.
+            if (achievement?.Kind == PomoAchievementKind.FocusBlockCompleted && HasSuppressedPanel()) return;
             if (achievement != null && receivedKeys.Add(achievement.Key)) pending.Enqueue(achievement);
         }
 

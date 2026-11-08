@@ -125,7 +125,8 @@ namespace Pomo.Business.Pomodoro
             return WorkBlockValidationResult.Valid;
         }
 
-        public WorkBlockModel CreateCustomBlock(string name, int focusMinutes, int breakMinutes, string taskId = null)
+        public WorkBlockModel CreateCustomBlock(string name, int focusMinutes, int breakMinutes, string taskId = null,
+            bool isFavorite = false)
         {
             if (ValidateCustomBlock(name, focusMinutes, breakMinutes) != WorkBlockValidationResult.Valid)
             {
@@ -140,7 +141,7 @@ namespace Pomo.Business.Pomodoro
                 focusMinutes = focusMinutes,
                 breakMinutes = breakMinutes,
                 isCustom = true,
-                isFavorite = false
+                isFavorite = isFavorite
             };
 
             workBlockRepository.AddCustomBlock(customBlock);

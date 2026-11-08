@@ -70,7 +70,8 @@ namespace Pomo.Data.Repositories
 
         private void SaveChanges()
         {
-            storageService.Save(inventory);
+            try { storageService.Save(inventory); }
+            catch (LocalDataWriteException) { Reload(); throw; }
         }
     }
 }

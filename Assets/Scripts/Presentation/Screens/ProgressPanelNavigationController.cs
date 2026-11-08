@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace Pomo.Presentation.Screens
@@ -32,7 +33,8 @@ namespace Pomo.Presentation.Screens
         public void OpenWeeklyProgress()
         {
             SetPanelStates(true, false, false, true, false, false);
-            weeklyPomoFeedback?.Refresh();
+            DateTime today = DateTime.Today;
+            weeklyPomoFeedback?.CompareWeeks(today.AddDays(-7), today);
         }
 
         public void OpenWeeklySummary()

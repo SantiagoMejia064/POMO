@@ -116,19 +116,18 @@ namespace Pomo.Data.Repositories
                 AddDefaultFavorite("preset-medium");
                 AddDefaultFavorite("preset-long");
                 storedBlocks.defaultPresetFavoritesInitialized = true;
-                SaveChanges();
             }
 
             if (string.IsNullOrWhiteSpace(storedBlocks.selectedBlockId))
             {
                 storedBlocks.selectedBlockId = "preset-short";
-                SaveChanges();
             }
         }
 
         private void SaveChanges()
         {
-            storageService.Save(storedBlocks);
+            try { storageService.Save(storedBlocks); }
+            catch (LocalDataWriteException) { Reload(); throw; }
         }
 
         private void AddDefaultFavorite(string blockId)

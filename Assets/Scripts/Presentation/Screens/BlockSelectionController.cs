@@ -248,6 +248,12 @@ namespace Pomo.Presentation.Screens
 
         public void StartSelectedBlock()
         {
+            if (pomodoroController != null && pomodoroController.State == Pomo.Shared.Enums.PomodoroTimerState.Completed)
+            {
+                pomodoroController.ResetTimer();
+                OpenWorkBlockSection();
+                return;
+            }
             pomodoroController?.StartBlock();
             SetAddToFavoritesButtonVisible(false);
         }
@@ -482,7 +488,8 @@ namespace Pomo.Presentation.Screens
 
         private void OnTimerStateChanged(Pomo.Shared.Enums.PomodoroTimerState state)
         {
-            if (state != Pomo.Shared.Enums.PomodoroTimerState.Completed) return;
+            if (state != Pomo.Shared.Enums.PomodoroTimerState.Completed ||
+                timerPanel == null || !timerPanel.activeInHierarchy) return;
 
             if (completionFireRawImage != null)
             {

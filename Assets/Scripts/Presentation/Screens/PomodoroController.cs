@@ -4,6 +4,8 @@ using Pomo.Business.Pomodoro;
 using Pomo.Business.Progress;
 using Pomo.Business.Tasks;
 using Pomo.Data.Models;
+using Pomo.Data.Persistence;
+using Pomo.Presentation.Feedback;
 using Pomo.ServicesAdapters.Audio;
 using Pomo.ServicesAdapters.Notifications;
 using Pomo.Shared.Enums;
@@ -38,7 +40,7 @@ namespace Pomo.Presentation.Screens
         [SerializeField] private AudioClip cycleCompletionClip;
 
         [Header("Prueba temporal")]
-        [SerializeField] private bool useShortTestCycle = true;
+        [SerializeField] private bool useShortTestCycle;
         [SerializeField, Min(1)] private int testFocusSeconds = 10;
         [SerializeField, Min(0)] private int testRestSeconds = 10;
 
@@ -139,7 +141,8 @@ namespace Pomo.Presentation.Screens
 
         public bool TrySelectBlock(string blockId)
         {
-            return CanChangeSessionSelection && sessionService.SelectBlock(blockId);
+            try { return CanChangeSessionSelection && sessionService.SelectBlock(blockId); }
+            catch (LocalDataWriteException) { return false; }
         }
 
         public void PrepareBlock()
@@ -177,9 +180,12 @@ namespace Pomo.Presentation.Screens
 
         public bool TrySaveSelectedBlock(string name)
         {
-            return CanChangeSessionSelection &&
-                   sessionService != null &&
-                   sessionService.TrySaveSelectedBlock(name, out _);
+            try
+            {
+                return CanChangeSessionSelection && sessionService != null &&
+                       sessionService.TrySaveSelectedBlock(name, out _);
+            }
+            catch (LocalDataWriteException) { return false; }
         }
 
         public void StartBlock()
@@ -234,12 +240,13 @@ namespace Pomo.Presentation.Screens
 
         public void ToggleFavorite()
         {
-            sessionService.ToggleFavorite();
+            if (SelectedBlock != null) ToggleFavorite(SelectedBlock.id);
         }
 
         public bool ToggleFavorite(string blockId)
         {
-            return sessionService != null && sessionService.ToggleFavorite(blockId);
+            try { return sessionService != null && sessionService.ToggleFavorite(blockId); }
+            catch (LocalDataWriteException) { return false; }
         }
 
         public string GetTaskTitleForBlock(WorkBlockModel block)
@@ -267,7 +274,7 @@ namespace Pomo.Presentation.Screens
                 DateUtils.TryParseStoredDate(currentTask.completedAt, out DateTimeOffset taskCompletedAt) &&
                 taskCompletedAt >= startedAt && taskCompletedAt <= completedAt;
 
-            DailyProgressModel recordedProgress = progressService.RecordFocusSession(new CompletedFocusBlockModel
+            var completedSession = new CompletedFocusBlockModel
             {
                 sessionId = activeSessionId ?? Guid.NewGuid().ToString(),
                 sessionDate = completedAt.LocalDateTime.ToString("yyyy-MM-dd"),
@@ -280,10 +287,16 @@ namespace Pomo.Presentation.Screens
                 recordingVersion = 1,
                 taskCompleted = taskCompletedDuringBlock,
                 workIntervals = new List<FocusWorkIntervalModel>(focusIntervals)
-            });
+            };
 
-            if (recordedProgress != null &&
-                progressService.AddCups(ProgressService.CompletedFocusBlockCupsReward))
+            DailyProgressModel recordedProgress = null;
+            try
+            {
+                recordedProgress = progressService.RecordFocusSession(completedSession,
+                    ProgressService.CompletedFocusBlockCupsReward);
+            }
+            catch (LocalDataWriteException) { /* The storage notice describes the failure. */ }
+            if (recordedProgress != null)
             {
                 LastFocusBlockCupsAwarded = ProgressService.CompletedFocusBlockCupsReward;
                 FocusBlockCupsAwarded?.Invoke(ProgressService.CompletedFocusBlockCupsReward);
@@ -294,7 +307,13 @@ namespace Pomo.Presentation.Screens
             activeSessionTask = null;
             focusIntervals.Clear();
             audioService.RequestCycleCompletedPlayback();
-            notificationService.NotifyBreakStarted(selectedTask?.title);
+            string message = timer.RestDurationSeconds > 0
+                ? "Terminó el bloque de trabajo. Es momento de descansar."
+                : "Terminó el bloque de trabajo.";
+            bool achievementVisible = recordedProgress != null && PomoFeedbackCoordinator.CanPresentBlock;
+            PomoRuntimeNotices.ShowMilestone(message, showBanner: !achievementVisible, announce: !achievementVisible);
+            if (timer.RestDurationSeconds > 0)
+                notificationService.NotifyBreakStarted(selectedTask?.title, quiet: Application.isFocused);
             WorkCompleted?.Invoke();
         }
 
@@ -322,7 +341,7 @@ namespace Pomo.Presentation.Screens
             if (worked >= 1)
             {
                 var end = DateTimeOffset.Now;
-                progressService.RecordFocusSession(new CompletedFocusBlockModel
+                var interruptedSession = new CompletedFocusBlockModel
                 {
                     sessionId = activeSessionId,
                     sessionDate = end.LocalDateTime.ToString("yyyy-MM-dd"),
@@ -335,7 +354,9 @@ namespace Pomo.Presentation.Screens
                     recordingVersion = 1,
                     interrupted = true,
                     workIntervals = new List<FocusWorkIntervalModel>(focusIntervals)
-                });
+                };
+                try { progressService.RecordFocusSession(interruptedSession); }
+                catch (LocalDataWriteException) { /* The storage notice describes the failure. */ }
             }
             activeSessionId = null;
             activeSessionTask = null;

@@ -1,5 +1,6 @@
 using System;
 using Pomo.Business.Progress;
+using Pomo.Data.Persistence;
 using Pomo.Data.Models;
 using Pomo.Shared.Enums;
 
@@ -48,17 +49,22 @@ namespace Pomo.Business.Store
             }
 
             // Charge first; if inventory persistence rejects the item, immediately restore the exact charge.
-            if (!progressService.TrySpendCups(item.PriceInCups))
+            try
             {
-                return StorePurchaseResult.InsufficientCups;
+                if (!progressService.TrySpendCups(item.PriceInCups))
+                    return StorePurchaseResult.InsufficientCups;
             }
+            catch (LocalDataWriteException) { return StorePurchaseResult.InventoryUpdateFailed; }
 
-            if (inventoryService.RegisterAcquiredItem(itemId) == StoreInventoryUpdateResult.Success)
+            try
             {
-                return StorePurchaseResult.Success;
+                if (inventoryService.RegisterAcquiredItem(itemId) == StoreInventoryUpdateResult.Success)
+                    return StorePurchaseResult.Success;
             }
+            catch (LocalDataWriteException) { /* Restore the debit below. */ }
 
-            progressService.AddCups(item.PriceInCups);
+            try { progressService.AddCups(item.PriceInCups); }
+            catch (LocalDataWriteException) { /* Storage already reported the refund failure. */ }
             return StorePurchaseResult.InventoryUpdateFailed;
         }
     }

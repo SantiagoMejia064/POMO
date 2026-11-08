@@ -610,6 +610,9 @@ namespace Pomo.Presentation.Screens
                 case TaskStatusTransitionResult.InvalidTransition:
                     ShowFeedback("La tarea debe iniciarse antes de completarse.");
                     break;
+                case TaskStatusTransitionResult.SaveFailed:
+                    ShowFeedback("No se guardó el cambio de estado.");
+                    break;
                 default:
                     ShowFeedback("No fue posible encontrar la tarea asociada.");
                     break;
@@ -726,6 +729,9 @@ namespace Pomo.Presentation.Screens
                 case TaskStatusTransitionResult.InvalidTransition:
                     ShowFeedback("La tarea debe iniciarse antes de completarse.");
                     break;
+                case TaskStatusTransitionResult.SaveFailed:
+                    ShowFeedback("No se guardó el cambio de estado.");
+                    break;
                 default:
                     ShowFeedback("No fue posible encontrar la tarea seleccionada.");
                     break;
@@ -737,7 +743,8 @@ namespace Pomo.Presentation.Screens
         public bool TryAwardCompletedTask(string taskId)
         {
             TaskModel task = taskService.GetTask(taskId);
-            return task != null && progressService.TryRecordTaskTrophyAward(task, out _);
+            try { return task != null && progressService.TryRecordTaskTrophyAward(task, out _); }
+            catch (Pomo.Data.Persistence.LocalDataWriteException) { return false; }
         }
 
         private void ShowValidationMessage(TaskValidationResult result)

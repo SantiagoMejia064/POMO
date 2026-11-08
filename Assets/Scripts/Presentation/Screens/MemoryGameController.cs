@@ -2,6 +2,7 @@ using System;
 using Pomo.Business.Minigames;
 using Pomo.Business.Pomodoro;
 using Pomo.ServicesAdapters.Audio;
+using Pomo.Presentation.Feedback;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -11,8 +12,6 @@ namespace Pomo.Presentation.Screens
     [DisallowMultipleComponent]
     public sealed class MemoryGameController : MonoBehaviour
     {
-        private const string AUDIO_ENABLED_KEY = "Pomo_AudioEnabled";
-
         [Header("Navegación")]
         [SerializeField] private GameObject homePanel;
         [SerializeField] private Button closeButton;
@@ -116,13 +115,6 @@ namespace Pomo.Presentation.Screens
             gameTimer.WorkCompleted += EndAtTimeLimit;
 
             audioService = new AudioService();
-
-            // Recuperar el estado de sonido guardado.
-            // Por defecto, el sonido está activado la primera vez.
-            bool audioGuardado =
-                PlayerPrefs.GetInt(AUDIO_ENABLED_KEY, 1) == 1;
-
-            audioService.SetEnabled(audioGuardado);
 
             audioService.CuePlaybackRequested += PlaySoundCue;
 
@@ -363,6 +355,7 @@ namespace Pomo.Presentation.Screens
             );
 
             audioService?.RequestCuePlayback(SoundCue.MemoryTimeUp);
+            PomoRuntimeNotices.ShowMilestone($"Tiempo agotado. Puntaje final: {game.Score} puntos.", showBanner: false);
 
             RefreshView();
 
@@ -435,6 +428,7 @@ namespace Pomo.Presentation.Screens
                     audioService?.RequestCuePlayback(
                         SoundCue.MemoryRoundCompleted
                     );
+                    PomoRuntimeNotices.ShowMilestone($"Ronda {game.RoundsCompleted} completa.", showBanner: false);
                     break;
             }
 
@@ -657,14 +651,6 @@ namespace Pomo.Presentation.Screens
             bool nuevoEstado = !audioService.IsEnabled;
 
             audioService.SetEnabled(nuevoEstado);
-
-            // Guardar el estado para futuras entradas y sesiones.
-            PlayerPrefs.SetInt(
-                AUDIO_ENABLED_KEY,
-                nuevoEstado ? 1 : 0
-            );
-
-            PlayerPrefs.Save();
 
             if (!nuevoEstado)
             {

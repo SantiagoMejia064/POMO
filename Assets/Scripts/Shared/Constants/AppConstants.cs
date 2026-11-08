@@ -6,5 +6,8 @@ namespace Pomo.Shared.Constants
         public const string WorkBlocksFileName = "work-blocks.json";
         public const string ProgressFileName = "progress.json";
         public const string StoreInventoryFileName = "store-inventory.json";
+        public const string RhythmRemindersFileName = "rhythm-reminders.json";
+        public const string AudioPreferenceKey = "Pomo_AudioEnabled";
+        public const string VibrationPreferenceKey = "pomo.feedback.vibration";
     }
 }

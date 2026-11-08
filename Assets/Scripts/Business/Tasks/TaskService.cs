@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Pomo.Business.Pomo;
 using Pomo.Data.Models;
+using Pomo.Data.Persistence;
 using Pomo.Data.Repositories;
 using Pomo.ServicesAdapters.Notifications;
 using Pomo.Shared.Enums;
@@ -88,7 +89,9 @@ namespace Pomo.Business.Tasks
                 status = TaskStatus.NotStarted
             };
 
-            taskRepository.Add(newTask);
+            taskRepository.Reload();
+            try { taskRepository.Add(newTask); }
+            catch (LocalDataWriteException) { return null; }
             ScheduleTaskReminder(newTask);
             return newTask;
         }
@@ -116,24 +119,26 @@ namespace Pomo.Business.Tasks
                 return null;
             }
 
+            taskRepository.Reload();
             TaskModel task = taskRepository.GetById(taskId);
             if (task == null)
             {
                 return null;
             }
 
-            notificationService.CancelTaskReminder(task);
+            int previousReminderId = task.reminderNotificationId;
             task.reminderNotificationId = NotificationService.NoNotificationId;
             task.title = title.Trim();
             task.description = description == null ? string.Empty : description.Trim();
             task.subject = subject.Trim();
             task.dueDate = parsedDueDate.ToString("O");
 
-            if (!taskRepository.Update(task))
+            if (!TrySaveTask(task))
             {
                 return null;
             }
 
+            notificationService.CancelTaskReminder(new TaskModel { reminderNotificationId = previousReminderId });
             if (task.status != TaskStatus.Completed)
             {
                 ScheduleTaskReminder(task);
@@ -144,16 +149,19 @@ namespace Pomo.Business.Tasks
 
         public bool DeleteTask(string taskId)
         {
+            taskRepository.Reload();
             TaskModel task = taskRepository.GetById(taskId);
             if (task == null)
             {
                 return false;
             }
 
-            notificationService.CancelTaskReminder(task);
-            bool deleted = taskRepository.Delete(taskId);
+            bool deleted;
+            try { deleted = taskRepository.Delete(taskId); }
+            catch (LocalDataWriteException) { return false; }
             if (deleted)
             {
+                notificationService.CancelTaskReminder(task);
                 notificationService.NotifyAfterSecondTaskDeletedToday();
             }
 
@@ -226,9 +234,9 @@ namespace Pomo.Business.Tasks
                 task.completedAt = DateTimeOffset.Now.ToString("O");
             }
 
-            if (!taskRepository.Update(task))
+            if (!TrySaveTask(task))
             {
-                return TaskStatusTransitionResult.TaskNotFound;
+                return TaskStatusTransitionResult.SaveFailed;
             }
 
             if (targetStatus == TaskStatus.Completed)
@@ -237,7 +245,7 @@ namespace Pomo.Business.Tasks
             if (targetStatus == TaskStatus.Completed && notificationService.CancelTaskReminder(task))
             {
                 task.reminderNotificationId = NotificationService.NoNotificationId;
-                taskRepository.Update(task);
+                TrySaveTask(task);
             }
 
             if (targetStatus == TaskStatus.Completed && CountTasksCompletedToday() == 2)
@@ -284,7 +292,17 @@ namespace Pomo.Business.Tasks
             }
 
             task.reminderNotificationId = notificationId;
-            taskRepository.Update(task);
+            if (!TrySaveTask(task))
+            {
+                notificationService.CancelTaskReminder(task);
+                task.reminderNotificationId = NotificationService.NoNotificationId;
+            }
+        }
+
+        private bool TrySaveTask(TaskModel task)
+        {
+            try { return taskRepository.Update(task); }
+            catch (LocalDataWriteException) { return false; }
         }
 
         private int CountTasksCompletedToday()

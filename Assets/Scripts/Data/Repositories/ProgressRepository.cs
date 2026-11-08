@@ -101,10 +101,10 @@ namespace Pomo.Data.Repositories
         }
 #endif
 
-        public bool TryRecordFocusSession(CompletedFocusBlockModel session, out DailyProgressModel day)
+        public bool TryRecordFocusSession(CompletedFocusBlockModel session, out DailyProgressModel day, int completionCups = 0)
         {
             day = null;
-            if (session == null || string.IsNullOrWhiteSpace(session.sessionId) || session.workedSeconds <= 0)
+            if (session == null || string.IsNullOrWhiteSpace(session.sessionId) || session.workedSeconds <= 0 || completionCups < 0)
                 return false;
 
             Reload();
@@ -124,6 +124,7 @@ namespace Pomo.Data.Repositories
                 day.completedBlocks.Add(session);
                 day.completedFocusBlocks++;
                 day.workedSeconds += session.workedSeconds;
+                storedProgress.cupsBalance += completionCups;
             }
             Save();
             return true;
@@ -212,7 +213,8 @@ namespace Pomo.Data.Repositories
 
         public void Save()
         {
-            storageService.Save(storedProgress);
+            try { storageService.Save(storedProgress); }
+            catch (LocalDataWriteException) { Reload(); throw; }
         }
 
         public void Reload()

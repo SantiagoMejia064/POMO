@@ -5,6 +5,7 @@ namespace Pomo.Shared.Enums
         Success,
         TaskNotFound,
         StatusUnchanged,
-        InvalidTransition
+        InvalidTransition,
+        SaveFailed
     }
 }

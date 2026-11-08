@@ -33,6 +33,7 @@ namespace Pomo.ServicesAdapters.Notifications
         private const int ReminderHour = 9;
         private const string TaskReminderChannelId = "pomo-task-reminders";
         private const string CycleReminderChannelId = "pomo-cycle-reminders";
+        private const string QuietBreakChannelId = "pomo-break-history";
         private const string RhythmChannelId = "pomo-rhythm-reminders";
 
         // These are the IDs configured in Edit > Project Settings > Mobile Notifications.
@@ -251,7 +252,7 @@ namespace Pomo.ServicesAdapters.Notifications
         /// Notifies the user when a focus phase ends and the break begins.
         /// In the Editor and on other platforms, logs the event for verification.
         /// </summary>
-        public int NotifyBreakStarted(string taskTitle)
+        public int NotifyBreakStarted(string taskTitle, bool quiet = false)
         {
             string notificationText = string.IsNullOrWhiteSpace(taskTitle)
                 ? "Tu bloque de trabajo terminó. Es momento de descansar."
@@ -267,7 +268,7 @@ namespace Pomo.ServicesAdapters.Notifications
                 ShouldAutoCancel = true
             };
 
-            int notificationId = SendNotificationSafely(notification, CycleReminderChannelId);
+            int notificationId = SendNotificationSafely(notification, quiet ? QuietBreakChannelId : CycleReminderChannelId);
             if (notificationId > 0)
             {
                 Debug.Log($"Recordatorio de descanso enviado: {notificationText}");
@@ -468,6 +469,15 @@ namespace Pomo.ServicesAdapters.Notifications
             try
             {
                 if (channelId == TaskReminderChannelId) EnsureNotificationChannel();
+                else if (channelId == QuietBreakChannelId)
+                    AndroidNotificationCenter.RegisterNotificationChannel(new AndroidNotificationChannel
+                    {
+                        Id = QuietBreakChannelId,
+                        Name = "Historial de descansos",
+                        Description = "Avisos que POMO ya mostró dentro de la aplicación.",
+                        Importance = Importance.Low,
+                        EnableVibration = false
+                    });
                 else EnsureCycleNotificationChannel();
                 return AndroidNotificationCenter.SendNotification(notification, channelId);
             }

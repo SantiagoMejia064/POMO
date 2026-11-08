@@ -107,7 +107,11 @@ namespace UnityEngine
     {
         private static readonly JsonSerializerOptions Options = new JsonSerializerOptions { IncludeFields = true };
         public static string ToJson(object value, bool pretty) => JsonSerializer.Serialize(value, value.GetType(), Options);
-        public static T FromJson<T>(string json) => JsonSerializer.Deserialize<T>(json, Options);
+        public static T FromJson<T>(string json)
+        {
+            try { return JsonSerializer.Deserialize<T>(json, Options); }
+            catch (JsonException exception) { throw new ArgumentException("JSON inválido", exception); }
+        }
     }
     public static class PlayerPrefs
     {
@@ -127,7 +131,7 @@ namespace Unity.Notifications.Android
 {
     public enum PermissionStatus { NotRequested, RequestPending, Allowed, Denied, NotificationsBlockedForApp }
     public enum NotificationStatus { Unknown, Scheduled, Delivered }
-    public enum Importance { High }
+    public enum Importance { High, Low }
     public class PermissionRequest
     {
         public static PermissionRequest Last;

@@ -1,4 +1,6 @@
 using System;
+using Pomo.Shared.Constants;
+using UnityEngine;
 
 namespace Pomo.ServicesAdapters.Audio
 {
@@ -19,17 +21,15 @@ namespace Pomo.ServicesAdapters.Audio
     /// </summary>
     public class AudioService
     {
-        // La preferencia se comparte entre Trabajo y Minijuegos durante esta sesión.
-        private static bool sessionSoundEnabled = true;
-
-        public bool IsEnabled => sessionSoundEnabled;
+        public bool IsEnabled => PlayerPrefs.GetInt(AppConstants.AudioPreferenceKey, 1) == 1;
 
         public event Action PlaybackRequested;
         public event Action<SoundCue> CuePlaybackRequested;
 
         public void SetEnabled(bool enabled)
         {
-            sessionSoundEnabled = enabled;
+            PlayerPrefs.SetInt(AppConstants.AudioPreferenceKey, enabled ? 1 : 0);
+            PlayerPrefs.Save();
         }
 
         public void RequestCycleCompletedPlayback()

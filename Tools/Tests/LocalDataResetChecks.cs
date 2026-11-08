@@ -15,7 +15,7 @@ internal static class LocalDataResetChecks
         Directory.CreateDirectory(directory);
         var owned = new List<string>();
         foreach (string name in new[] { "tasks.json", "work-blocks.json", "progress.json", "store-inventory.json", "rhythm-reminders.json" })
-            foreach (string suffix in new[] { "", ".tmp" })
+            foreach (string suffix in new[] { "", ".tmp", ".bak" })
             {
                 string path = Path.Combine(directory, name + suffix);
                 File.WriteAllText(path, "datos de prueba");
