@@ -11,7 +11,8 @@ namespace Pomo.Presentation.Screens
     public sealed class PrivacyConsentController : MonoBehaviour
     {
         public const string AcceptedVersionKey = "pomo.privacy.accepted-version";
-        public const int NoticeVersion = 1;
+        // Version 4 restarts the consent flow for the current onboarding test.
+        public const int NoticeVersion = 4;
 
         [SerializeField, InspectorName("Contenido de bienvenida")] private CanvasGroup welcomeContent;
         [SerializeField, InspectorName("Panel de consentimiento")] private GameObject consentPanel;
@@ -47,10 +48,10 @@ namespace Pomo.Presentation.Screens
             noticePanel.SetActive(false);
             consentCard.interactable = true;
             consentCard.blocksRaycasts = true;
-            // The saved scene decides which panel starts visible. Never skip it using an old acceptance.
-            acceptedInCurrentOpening = !consentPanel.activeSelf;
-            welcomeContent.interactable = acceptedInCurrentOpening;
-            welcomeContent.blocksRaycasts = acceptedInCurrentOpening;
+            // Keep the consent across application launches. Incrementing NoticeVersion
+            // intentionally asks for consent again if the notice is updated.
+            acceptedInCurrentOpening = HasAccepted;
+            ApplyGate(!acceptedInCurrentOpening);
         }
 
         private void Initialize()
