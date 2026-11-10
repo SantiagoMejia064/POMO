@@ -11,8 +11,8 @@ namespace Pomo.Presentation.Screens
     public sealed class PrivacyConsentController : MonoBehaviour
     {
         public const string AcceptedVersionKey = "pomo.privacy.accepted-version";
-        // Version 4 restarts the consent flow for the current onboarding test.
-        public const int NoticeVersion = 4;
+        // Version 2 invalidates previous local onboarding data for this test cycle.
+        public const int NoticeVersion = 2;
 
         [SerializeField, InspectorName("Contenido de bienvenida")] private CanvasGroup welcomeContent;
         [SerializeField, InspectorName("Panel de consentimiento")] private GameObject consentPanel;
