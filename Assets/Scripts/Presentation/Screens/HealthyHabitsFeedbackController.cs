@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
+using Pomo.Data.Persistence;
+using Pomo.Presentation.UI;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -10,21 +12,22 @@ namespace Pomo.Presentation.Screens
     [DisallowMultipleComponent]
     public sealed class HealthyHabitsFeedbackController : MonoBehaviour
     {
-        private const string PreferencePrefix = "pomo.healthy-habits.v2.";
-
         [SerializeField] private TMP_Text excellentFeedback;
+        [SerializeField] private bool scrollFeedback;
 
         private Toggle[] habits;
-        private TMP_Text[] labels;
+        private string[] labels;
 
         private void Awake()
         {
             habits = GetComponentsInChildren<Toggle>(true);
-            labels = GetComponentsInChildren<TMP_Text>(true);
+            labels = new string[habits.Length];
+            if (scrollFeedback && excellentFeedback != null) PrepareFeedbackScroll();
 
             for (int index = 0; index < habits.Length; index++)
             {
                 int capturedIndex = index;
+                labels[index] = GetHabitLabel(habits[index], index);
                 habits[index].SetIsOnWithoutNotify(PlayerPrefs.GetInt(Key(capturedIndex), 0) == 1);
                 habits[index].onValueChanged.AddListener(value => SaveHabit(capturedIndex, value));
             }
@@ -58,7 +61,7 @@ namespace Pomo.Presentation.Screens
             {
                 if (habits[index] != null && !habits[index].isOn)
                 {
-                    pending.Add(GetHabitLabel(habits[index], index));
+                    pending.Add(labels[index]);
                 }
             }
 
@@ -72,42 +75,38 @@ namespace Pomo.Presentation.Screens
             excellentFeedback.text = habitList;
         }
 
-        private string GetHabitLabel(Toggle habit, int index)
+        private void PrepareFeedbackScroll()
         {
-            TMP_Text closest = null;
-            TMP_Text closestTitle = null;
-            float shortestDistance = float.MaxValue;
-            float shortestTitleDistance = float.MaxValue;
-            Vector3 habitPosition = habit.transform.position;
+            RectTransform text = excellentFeedback.rectTransform;
+            RectTransform viewport = PomoVisualStyle.Rect("Retroalimentación de hábitos", text.parent,
+                new Vector2(.12f, .33f), new Vector2(.88f, .66f));
+            viewport.gameObject.AddComponent<Image>().color = Color.clear;
+            viewport.gameObject.AddComponent<RectMask2D>();
+            var scroll = viewport.gameObject.AddComponent<ScrollRect>();
+            scroll.horizontal = false;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 90f;
+            scroll.viewport = viewport;
+            scroll.content = text;
 
-            foreach (TMP_Text label in labels)
-            {
-                if (label == null || label == excellentFeedback || !IsHabitLabel(label.text)) continue;
-                float distance = Vector3.SqrMagnitude(label.transform.position - habitPosition);
-                if (distance < shortestDistance)
-                {
-                    shortestDistance = distance;
-                    closest = label;
-                }
-                if (IsHabitTitle(label.text) && distance < shortestTitleDistance)
-                {
-                    shortestTitleDistance = distance;
-                    closestTitle = label;
-                }
-            }
-
-            TMP_Text selectedLabel = closestTitle ?? closest;
-            if (selectedLabel == null) return "hábito " + (index + 1);
-            return selectedLabel.text.Replace('\n', ' ').Trim();
+            text.SetParent(viewport, false);
+            text.localScale = Vector3.one;
+            text.pivot = new Vector2(.5f, 1f);
+            PomoVisualStyle.Bounds(text, Vector2.up, Vector2.one);
+            excellentFeedback.alignment = TextAlignmentOptions.TopLeft;
+            excellentFeedback.fontSize = 39;
+            excellentFeedback.enableAutoSizing = false;
+            excellentFeedback.textWrappingMode = TextWrappingModes.Normal;
+            excellentFeedback.overflowMode = TextOverflowModes.Overflow;
+            excellentFeedback.raycastTarget = false;
+            text.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         }
 
-        private static bool IsHabitLabel(string text)
+        private static string GetHabitLabel(Toggle habit, int index)
         {
-            if (string.IsNullOrWhiteSpace(text)) return false;
-            string normalized = text.Replace('\n', ' ').Trim();
-            return !string.Equals(normalized, "Siguiente", System.StringComparison.OrdinalIgnoreCase) &&
-                !string.Equals(normalized, "Hábitos saludables", System.StringComparison.OrdinalIgnoreCase) &&
-                !string.Equals(normalized, "Habitos saludables", System.StringComparison.OrdinalIgnoreCase);
+            var rowLabels = habit.transform.parent.GetComponentsInChildren<TMP_Text>(true)
+                .Select(label => label.text.Replace('\n', ' ').Trim()).Where(label => label.Length > 0).ToArray();
+            return rowLabels.FirstOrDefault(IsHabitTitle) ?? rowLabels.FirstOrDefault() ?? "hábito " + (index + 1);
         }
 
         private static bool IsHabitTitle(string text)
@@ -117,6 +116,6 @@ namespace Pomo.Presentation.Screens
                 string.Equals(normalized, normalized.ToUpperInvariant(), System.StringComparison.Ordinal);
         }
 
-        private static string Key(int index) => PreferencePrefix + index;
+        private static string Key(int index) => LocalUserProfile.HealthyHabitKey(index);
     }
 }

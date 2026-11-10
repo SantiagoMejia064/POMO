@@ -3,6 +3,7 @@ using System.Collections;
 using System.Globalization;
 using Pomo.Business.Progress;
 using Pomo.Data.Models;
+using Pomo.Presentation.UI;
 using Pomo.ServicesAdapters.Notifications;
 using TMPro;
 using UnityEngine;
@@ -49,9 +50,6 @@ namespace Pomo.Presentation.Screens
         [SerializeField] private NotificationPermissionController permisosNotificaciones;
 
         private static readonly CultureInfo Spanish = CultureInfo.GetCultureInfo("es-CO");
-        private static readonly Color Blue = new Color32(75, 115, 169, 255);
-        private static readonly Color Green = new Color32(0, 193, 101, 255);
-        private static readonly Color Unknown = new Color32(190, 206, 222, 255);
         private readonly int[] hourValues = new int[24];
         private DateTime month;
         private DateTime selectedDate;
@@ -60,11 +58,13 @@ namespace Pomo.Presentation.Screens
         private bool busy;
         private int lastMinute = -1;
         private RhythmReminderService reminders;
+        private Vector2 lastCanvasSize;
+        private Rect lastSafeArea;
 
         private void OnEnable() => Fit();
         private void Update()
         {
-            Fit();
+            if (canvasRect != null && (canvasRect.rect.size != lastCanvasSize || Screen.safeArea != lastSafeArea)) Fit();
             if (Application.isPlaying && !busy && hourPanel.activeSelf && lastMinute != DateTime.Now.Minute)
             {
                 lastMinute = DateTime.Now.Minute;
@@ -74,14 +74,13 @@ namespace Pomo.Presentation.Screens
 
         private void Fit()
         {
-            if (canvasRect == null || screenRoot == null || canvasRect.rect.width <= 0) return;
-            var p = screenRoot.parent.lossyScale;
-            if (Mathf.Abs(p.x) < .0001f || Mathf.Abs(p.y) < .0001f || Mathf.Abs(p.z) < .0001f) return;
-            var c = canvasRect.lossyScale;
-            if (screenRoot.sizeDelta != canvasRect.rect.size) screenRoot.sizeDelta = canvasRect.rect.size;
-            screenRoot.position = canvasRect.position;
-            screenRoot.rotation = canvasRect.rotation;
-            screenRoot.localScale = new Vector3(c.x / p.x, c.y / p.y, c.z / p.z);
+            if (canvasRect == null) return;
+            lastCanvasSize = canvasRect.rect.size;
+            lastSafeArea = Screen.safeArea;
+            PomoVisualStyle.FitOverlay(screenRoot, canvasRect);
+            PomoVisualStyle.FitBackground(datePanel, canvasRect);
+            PomoVisualStyle.FitBackground(hourPanel, canvasRect);
+            PomoVisualStyle.FitBackground(confirmationPanel, canvasRect);
         }
 
         public void Open()
@@ -124,7 +123,8 @@ namespace Pomo.Presentation.Screens
                 dayButtons[cell].interactable = valid && month.AddDays(day - 1) >= DateTime.Today;
                 var image = (Image)dayButtons[cell].targetGraphic;
                 bool selected = valid && month.AddDays(day - 1) == selectedDate;
-                image.color = selected ? Green : Blue;
+                PomoVisualStyle.Round(image, 55);
+                image.color = selected ? PomoVisualStyle.Turquoise : PomoVisualStyle.Navy;
                 image.enabled = valid;
             }
         }
@@ -167,7 +167,7 @@ namespace Pomo.Presentation.Screens
             }
             hourTitle.text = nameInput.text.Trim();
             hourDate.text = selectedDate.ToString("dddd dd/MM/yyyy", Spanish);
-            hourFeedback.text = "Gris: sin datos suficientes. Azul a verde: actividad registrada.";
+            hourFeedback.text = "Azul oscuro: sin datos suficientes. Turquesa y verde: actividad registrada.";
             Show(hourPanel);
             RenderHours();
         }
@@ -189,13 +189,17 @@ namespace Pomo.Presentation.Screens
                 var slot = analysis.slots[(first + i) % analysis.slots.Count];
                 hourValues[i] = slot.startHour;
                 bool sufficient = slot.sessionCount >= 2 && slot.workedSeconds > 0;
-                ((Image)hours[i].button.targetGraphic).color = sufficient && max > 0
-                    ? Color.Lerp(Blue, Green, (float)(slot.workedSeconds / max)) : Unknown;
+                var image = (Image)hours[i].button.targetGraphic;
+                PomoVisualStyle.Round(image, 22);
+                image.color = sufficient && max > 0
+                    ? Color.Lerp(PomoVisualStyle.Turquoise, PomoVisualStyle.Green, (float)(slot.workedSeconds / max))
+                    : PomoVisualStyle.Navy;
                 hours[i].label.text = $"{slot.startHour:00}:00\n" +
                     (sufficient ? $"{slot.Minutes:0} min" : slot.sessionCount == 0 ? "Sin datos" : "Pocos datos");
-                hours[i].label.color = sufficient ? Color.white : new Color32(20, 54, 92, 255);
-                hours[i].label.fontSize = analysis.slots.Count > 12 ? 44 : 54;
+                hours[i].label.color = sufficient ? PomoVisualStyle.Ink : Color.white;
+                PomoVisualStyle.FitText(hours[i].label, 18, analysis.slots.Count > 12 ? 44 : 54);
                 hours[i].button.interactable = selectedDate.AddHours(slot.startHour) > DateTime.Now;
+                hours[i].selection.effectColor = PomoVisualStyle.Gold;
                 hours[i].selection.enabled = selectedHour == slot.startHour;
                 var rect = (RectTransform)hours[i].button.transform;
                 int rows = (analysis.slots.Count + 3) / 4;

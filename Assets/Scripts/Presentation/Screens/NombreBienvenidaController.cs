@@ -14,6 +14,8 @@ namespace Pomo.Presentation.Screens
         [SerializeField] private GameObject panelBienvenida;
         [SerializeField] private GameObject panelHola;
         [SerializeField] private GameObject panelInicio;
+        [SerializeField] private GameObject panelHabitos;
+        [SerializeField] private GameObject panelExcelente;
         [SerializeField] private PrivacyConsentController privacidad;
         [SerializeField] private TMP_Text avisoNombre;
         [SerializeField] private TMP_Text saludoPersonalizado;
@@ -25,19 +27,45 @@ namespace Pomo.Presentation.Screens
             nombre.richText = false;
             if (saludoPersonalizado != null) saludoPersonalizado.richText = false;
             nombre.onValueChanged.AddListener(Actualizar);
-            if (LocalUserProfile.Name.Length > 0 && privacidad != null && privacidad.HasAccepted)
-            {
-                AbrirInicioParaUsuarioExistente();
-                return;
-            }
             PrepararEntrada();
         }
 
-        private void AbrirInicioParaUsuarioExistente()
+        private void Start() => RestaurarEntrada();
+
+        public void RestaurarEntrada()
         {
-            if (panelInicio != null) panelInicio.SetActive(true);
+            if (privacidad != null && privacidad.HasAccepted && LocalUserProfile.Name.Length > 0)
+            {
+                if (LocalUserProfile.HasCompletedOnboarding && panelInicio != null)
+                {
+                    AbrirInicio();
+                    return;
+                }
+                if (panelExcelente != null)
+                {
+                    AbrirSaludo();
+                    return;
+                }
+            }
+            panelBienvenida.SetActive(true);
+            PrepararEntrada();
+        }
+
+        private void AbrirInicio()
+        {
+            panelInicio.SetActive(true);
+            if (panelExcelente != null) panelExcelente.SetActive(false);
+            if (panelHabitos != null) panelHabitos.SetActive(false);
             if (panelHola != null) panelHola.SetActive(false);
-            if (panelBienvenida != null) panelBienvenida.SetActive(false);
+            panelBienvenida.SetActive(false);
+        }
+
+        public void FinalizarOnboarding()
+        {
+            if (panelInicio == null || panelExcelente == null || !panelExcelente.activeInHierarchy ||
+                privacidad == null || !privacidad.HasAccepted || LocalUserProfile.Name.Length == 0) return;
+            LocalUserProfile.CompleteOnboarding();
+            AbrirInicio();
         }
 
         public void PrepararEntrada()
@@ -60,7 +88,10 @@ namespace Pomo.Presentation.Screens
             if (!panelBienvenida.activeInHierarchy || privacidad.IsBlockingWelcome || !nombreEscritoEnEstaEntrada) return;
             try
             {
-                if (!LocalUserProfile.TrySaveName(nombre.text)) { Actualizar(nombre.text); return; }
+                bool guardado = panelExcelente != null
+                    ? LocalUserProfile.TryStartOnboarding(nombre.text)
+                    : LocalUserProfile.TrySaveName(nombre.text);
+                if (!guardado) { Actualizar(nombre.text); return; }
             }
             catch (Exception exception)
             {
@@ -68,10 +99,12 @@ namespace Pomo.Presentation.Screens
                 Debug.LogError("POMO: no se pudo guardar el nombre. " + exception.Message);
                 return;
             }
-            if (saludoPersonalizado != null)
-            {
-                saludoPersonalizado.text = "Querid@ " + LocalUserProfile.Name;
-            }
+            AbrirSaludo();
+        }
+
+        private void AbrirSaludo()
+        {
+            if (saludoPersonalizado != null) saludoPersonalizado.text = "Querid@ " + LocalUserProfile.Name;
             panelHola.SetActive(true);
             panelBienvenida.SetActive(false);
         }

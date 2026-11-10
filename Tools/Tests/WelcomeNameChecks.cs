@@ -17,14 +17,17 @@ internal static class WelcomeNameChecks
         var next=new Button();
         var welcome=new GameObject();
         var hello=new GameObject(); hello.SetActive(false);
+        var home=new GameObject(); home.SetActive(false);
+        var excellent=new GameObject(); excellent.SetActive(false);
         var privacy=new PrivacyConsentController { IsBlockingWelcome=true };
         void Assign(string name, object value) => typeof(NombreBienvenidaController).GetField(name,BindingFlags.Instance|BindingFlags.NonPublic).SetValue(controller,value);
         Assign("nombre",input); Assign("botonContinuar",next); Assign("panelBienvenida",welcome);
         Assign("panelHola",hello); Assign("privacidad",privacy); Assign("avisoNombre",new TMP_Text());
+        Assign("panelInicio",home); Assign("panelExcelente",excellent);
         typeof(NombreBienvenidaController).GetMethod("Awake",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(controller,null);
         check(input.text==""&&!next.interactable,"Un nombre guardado no rellena el campo ni habilita Siguiente.");
         privacy.IsBlockingWelcome=false;
-        controller.PrepararEntrada(); // Privacy's Accept calls this before revealing the welcome.
+        controller.PrepararEntrada();
         controller.Continuar();
         check(welcome.activeInHierarchy&&!hello.activeInHierarchy,"Aceptar privacidad sin escribir no permite avanzar ni por llamada directa.");
         input.text="   "; controller.Continuar();
@@ -40,6 +43,26 @@ internal static class WelcomeNameChecks
         input.text=" Santiago "; controller.Continuar();
         check(!welcome.activeInHierarchy&&hello.activeInHierarchy&&LocalUserProfile.Name=="Santiago",
             "Solo continuar con un nombre escrito guarda el perfil y abre Hola.");
+        check(!LocalUserProfile.HasCompletedOnboarding,"Guardar el nombre deja pendiente el resto de la bienvenida.");
+        welcome.SetActive(true);
+        hello.SetActive(false);
+        privacy.HasAccepted=true;
+        controller.RestaurarEntrada();
+        check(hello.activeInHierarchy&&!welcome.activeInHierarchy&&!home.activeInHierarchy,
+            "Con el onboarding pendiente se recupera el saludo y todavía no se abre Inicio.");
+        excellent.SetActive(true);
+        controller.FinalizarOnboarding();
+        check(LocalUserProfile.HasCompletedOnboarding&&home.activeInHierarchy&&!excellent.activeInHierarchy,
+            "Terminar el onboarding persiste el estado y activa Inicio.");
+        home.SetActive(false);
+        controller.RestaurarEntrada();
+        check(home.activeInHierarchy&&!welcome.activeInHierarchy,
+            "Un perfil completo con consentimiento abre Inicio aunque la bienvenida ya esté apagada.");
+        home.SetActive(false);
+        privacy.HasAccepted=false;
+        controller.RestaurarEntrada();
+        check(!home.activeInHierarchy&&welcome.activeInHierarchy,
+            "Un perfil completo sin consentimiento vigente permanece en la bienvenida.");
     }
 }
 
@@ -52,7 +75,7 @@ namespace UnityEngine
 }
 namespace TMPro
 {
-    public class TMP_Text { public string text; }
+    public class TMP_Text { public string text; public bool richText; }
     public class TMP_InputField
     {
         public int characterLimit; public bool richText;
@@ -70,4 +93,4 @@ namespace TMPro
     }
 }
 namespace UnityEngine.UI { public class Button { public bool interactable=true; } }
-namespace Pomo.Presentation.Screens { public class PrivacyConsentController { public bool IsBlockingWelcome; } }
+namespace Pomo.Presentation.Screens { public class PrivacyConsentController { public bool IsBlockingWelcome; public bool HasAccepted; } }

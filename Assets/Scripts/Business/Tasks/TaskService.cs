@@ -64,6 +64,12 @@ namespace Pomo.Business.Tasks
         // Creación de una nueva tarea
         public TaskModel CreateTask(string title, string description, string subject, string dueDate)
         {
+            return CreateTask(title, description, subject, dueDate, CalendarEventColor.Navy);
+        }
+
+        public TaskModel CreateTask(string title, string description, string subject, string dueDate,
+            CalendarEventColor calendarColor)
+        {
             TaskValidationResult validationResult = ValidateTask(
                 title,
                 subject,
@@ -86,7 +92,8 @@ namespace Pomo.Business.Tasks
                 subject = subject,
                 dueDate = parsedDueDate.ToString("O"),
                 createdAt = DateTimeOffset.Now.ToString("O"),
-                status = TaskStatus.NotStarted
+                status = TaskStatus.NotStarted,
+                calendarColor = calendarColor
             };
 
             taskRepository.Reload();
@@ -104,6 +111,16 @@ namespace Pomo.Business.Tasks
         public TaskModel GetTask(string taskId)
         {
             return taskRepository.GetById(taskId);
+        }
+
+        public bool SetCalendarColor(string taskId, CalendarEventColor color)
+        {
+            taskRepository.Reload();
+            TaskModel task = taskRepository.GetById(taskId);
+            if (task == null) return false;
+            if (task.calendarColor == color) return true;
+            task.calendarColor = color;
+            return TrySaveTask(task);
         }
 
         public TaskModel UpdateTask(

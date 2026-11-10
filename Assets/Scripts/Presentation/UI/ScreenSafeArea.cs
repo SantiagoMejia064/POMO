@@ -7,6 +7,7 @@ namespace Pomo.Presentation.UI
     [DisallowMultipleComponent]
     public sealed class ScreenSafeArea : MonoBehaviour
     {
+        [SerializeField] private bool fitToRootCanvas;
         private Rect lastSafeArea;
         private Rect lastCanvasRect;
         private RectTransform content;
@@ -31,13 +32,18 @@ namespace Pomo.Presentation.UI
             Rect bounds = rootCanvas.pixelRect;
             if (bounds.width <= 0f || bounds.height <= 0f) return;
             Rect safe = Screen.safeArea;
-            content.anchorMin = new Vector2(
-                Mathf.Clamp01((safe.xMin - bounds.xMin) / bounds.width),
-                Mathf.Clamp01((safe.yMin - bounds.yMin) / bounds.height));
-            content.anchorMax = new Vector2(
-                Mathf.Clamp01((safe.xMax - bounds.xMin) / bounds.width),
-                Mathf.Clamp01((safe.yMax - bounds.yMin) / bounds.height));
-            content.offsetMin = content.offsetMax = Vector2.zero;
+            if (fitToRootCanvas)
+                PomoVisualStyle.FitOverlay(content, (RectTransform)rootCanvas.transform);
+            else
+            {
+                content.anchorMin = new Vector2(
+                    Mathf.Clamp01((safe.xMin - bounds.xMin) / bounds.width),
+                    Mathf.Clamp01((safe.yMin - bounds.yMin) / bounds.height));
+                content.anchorMax = new Vector2(
+                    Mathf.Clamp01((safe.xMax - bounds.xMin) / bounds.width),
+                    Mathf.Clamp01((safe.yMax - bounds.yMin) / bounds.height));
+                content.offsetMin = content.offsetMax = Vector2.zero;
+            }
             lastSafeArea = safe;
             lastCanvasRect = bounds;
         }

@@ -68,6 +68,8 @@ namespace Pomo.Presentation.UI
                                 texto.font = fuenteClasica;
                     }
                     if (!(boton.targetGraphic is Image imagen) || !EsFondoPlano(imagen.sprite)) continue;
+                    if (imagen.sprite == fondoRedondeado && imagen.type == Image.Type.Sliced &&
+                        !Mathf.Approximately(imagen.pixelsPerUnitMultiplier, 1f)) continue;
                     if (imagen.sprite != fondoRedondeado) imagen.sprite = fondoRedondeado;
                     if (imagen.type != Image.Type.Sliced) imagen.type = Image.Type.Sliced;
                     float escala = 12f / Mathf.Max(1f, radioEsquinas);

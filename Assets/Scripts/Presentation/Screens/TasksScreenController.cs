@@ -7,6 +7,7 @@ using Pomo.Data.Models;
 using Pomo.Shared.Enums;
 using Pomo.Shared.Utilities;
 using Pomo.ServicesAdapters.Notifications;
+using Pomo.Presentation.UI;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -73,6 +74,9 @@ namespace Pomo.Presentation.Screens
         [SerializeField] private GameObject calendarEditSummaryPanel;
         [SerializeField] private TMP_Text calendarTaskNameText;
         [SerializeField] private TMP_Text calendarTaskSubjectText;
+        [SerializeField] private TMP_Text calendarTaskDescriptionText;
+        [SerializeField] private TMP_Text calendarColorFeedback;
+        [SerializeField] private bool calendarColorsEnabled;
 
         [Header("Confirmaciones de edición")]
         public GameObject savedChangesPanel;
@@ -103,6 +107,8 @@ namespace Pomo.Presentation.Screens
         private Vector3 deleteConfirmationScale;
         private bool taskDetailOpenedFromCalendar;
         private Action returnToBlockCreation;
+        private CalendarEventPalette createCalendarPalette;
+        private CalendarEventPalette editCalendarPalette;
 
         private void Awake()
         {
@@ -177,7 +183,8 @@ namespace Pomo.Presentation.Screens
                 titleInput.text,
                 descriptionInput.text,
                 subjectInput.text,
-                dueDateInput.text);
+                dueDateInput.text,
+                createCalendarPalette?.Value ?? CalendarEventColor.Navy);
 
             if (task == null)
             {
@@ -311,6 +318,13 @@ namespace Pomo.Presentation.Screens
 
         public void SaveCalendarEditSummary()
         {
+            if (editCalendarPalette != null && !string.IsNullOrWhiteSpace(calendarSelectedTaskId) &&
+                !taskService.SetCalendarColor(calendarSelectedTaskId, editCalendarPalette.Value))
+            {
+                if (calendarColorFeedback != null) calendarColorFeedback.text = "No fue posible guardar el color.";
+                else ShowFeedback("No fue posible guardar el color.");
+                return;
+            }
             CloseCalendarEditSummary();
         }
 
@@ -437,6 +451,12 @@ namespace Pomo.Presentation.Screens
         public void OpenCreateTaskFormForDate(string dueDate)
         {
             OpenCreateTaskForm();
+            if (calendarColorsEnabled)
+            {
+                createCalendarPalette ??= new CalendarEventPalette(taskFormPanel.transform,
+                    new Vector2(.12f, .38f), new Vector2(.88f, .46f), titleInput.textComponent.font);
+                createCalendarPalette.SetVisible(true);
+            }
 
             if (dueDateInput != null && DateUtils.TryParseUiDate(dueDate, out DateTimeOffset selectedDate))
             {
@@ -679,6 +699,11 @@ namespace Pomo.Presentation.Screens
 
         private void ClearTaskForm()
         {
+            if (createCalendarPalette != null)
+            {
+                createCalendarPalette.Select(CalendarEventColor.Navy);
+                createCalendarPalette.SetVisible(false);
+            }
             titleInput.text = string.Empty;
             descriptionInput.text = string.Empty;
             subjectInput.text = string.Empty;
@@ -836,10 +861,43 @@ namespace Pomo.Presentation.Screens
 
             calendarTaskNameText.text = task.title ?? string.Empty;
             calendarTaskSubjectText.text = task.subject ?? string.Empty;
+            if (calendarTaskDescriptionText != null)
+                calendarTaskDescriptionText.text = task.description ?? string.Empty;
+            if (calendarColorFeedback != null) calendarColorFeedback.text = string.Empty;
             calendarSelectedTaskId = task.id;
+            if (calendarColorsEnabled)
+            {
+                EnsureCalendarSummaryPalette();
+                editCalendarPalette.Select(task.calendarColor);
+            }
 
             SetTaskPanels(false, false, false);
             calendarEditSummaryPanel.SetActive(true);
+        }
+
+        private void EnsureCalendarSummaryPalette()
+        {
+            if (editCalendarPalette != null) return;
+            Transform card = calendarTaskNameText.transform.parent;
+            editCalendarPalette = new CalendarEventPalette(card,
+                new Vector2(.10f, .30f), new Vector2(.90f, .51f), calendarTaskSubjectText.font);
+
+            var cancel = PomoVisualStyle.Rect("Cancelar edición del color", card,
+                new Vector2(.06f, .04f), new Vector2(.94f, .14f));
+            var image = cancel.gameObject.AddComponent<Image>();
+            image.color = PomoVisualStyle.Navy;
+            PomoVisualStyle.Round(image, 20);
+            var button = cancel.gameObject.AddComponent<Button>();
+            button.targetGraphic = image;
+            button.onClick.AddListener(CloseCalendarEditSummary);
+            var label = PomoVisualStyle.Rect("Texto", cancel, Vector2.zero, Vector2.one)
+                .gameObject.AddComponent<TextMeshProUGUI>();
+            label.font = calendarTaskNameText.font;
+            label.text = "Cancelar";
+            label.color = Color.white;
+            label.alignment = TextAlignmentOptions.Center;
+            label.raycastTarget = false;
+            PomoVisualStyle.FitText(label, 20, 44);
         }
 
         private void SetTaskPanels(bool showList, bool showCreateForm, bool showDetail)

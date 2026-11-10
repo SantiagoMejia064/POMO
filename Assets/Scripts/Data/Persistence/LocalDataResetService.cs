@@ -13,11 +13,19 @@ namespace Pomo.Data.Persistence
             AppConstants.ProgressFileName, AppConstants.StoreInventoryFileName,
             AppConstants.RhythmRemindersFileName
         };
-        public static readonly IReadOnlyList<string> PreferenceKeys = Array.AsReadOnly(new[] {
-            AppConstants.AudioPreferenceKey, AppConstants.VibrationPreferenceKey,
-            "pomo.deleted-tasks.date", "pomo.deleted-tasks.count",
-            "pomo.privacy.accepted-version", LocalUserProfile.NameKey
-        });
+        public static readonly IReadOnlyList<string> PreferenceKeys = BuildPreferenceKeys();
+
+        private static IReadOnlyList<string> BuildPreferenceKeys()
+        {
+            var keys = new List<string> {
+                AppConstants.AudioPreferenceKey, AppConstants.VibrationPreferenceKey,
+                "pomo.deleted-tasks.date", "pomo.deleted-tasks.count",
+                "pomo.privacy.accepted-version", LocalUserProfile.NameKey, LocalUserProfile.OnboardingKey
+            };
+            for (int i = 0; i < LocalUserProfile.HealthyHabitCount; i++)
+                keys.Add(LocalUserProfile.HealthyHabitKey(i));
+            return keys.AsReadOnly();
+        }
         private readonly string directory;
         private readonly Action cancelNotifications;
         private readonly Action clearPreferences;

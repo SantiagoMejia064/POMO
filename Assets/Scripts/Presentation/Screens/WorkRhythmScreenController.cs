@@ -2,6 +2,7 @@ using System;
 using Pomo.Business.Progress;
 using Pomo.Data.Models;
 using Pomo.Data.Repositories;
+using Pomo.Presentation.UI;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -61,6 +62,10 @@ namespace Pomo.Presentation.Screens
         private int guideStep;
         private DateTime lastRefreshDate;
         private Vector2 lastCanvasSize;
+        private Rect lastSafeArea;
+        private RhythmPlot plot;
+        private readonly float[] chartRatios = new float[24];
+        private readonly int[] chartHours = new int[24];
 
         public event Action<WorkRhythmRecommendation> RecommendationChanged;
         public WorkRhythmRecommendation CurrentRecommendation => current?.recommendation;
@@ -81,7 +86,7 @@ namespace Pomo.Presentation.Screens
 
         private void Update()
         {
-            if (canvasRect != null && canvasRect.rect.size != lastCanvasSize) FitToCanvas();
+            if (canvasRect != null && (canvasRect.rect.size != lastCanvasSize || Screen.safeArea != lastSafeArea)) FitToCanvas();
             if (!Application.isPlaying) return;
             if (lastRefreshDate != DateTime.Today) Refresh();
         }
@@ -89,15 +94,9 @@ namespace Pomo.Presentation.Screens
         public void FitToCanvas()
         {
             if (screenRoot == null || canvasRect == null) return;
-            Vector3 parentScale = screenRoot.parent.lossyScale;
-            if (Mathf.Abs(parentScale.x) < .0001f || Mathf.Abs(parentScale.y) < .0001f ||
-                Mathf.Abs(parentScale.z) < .0001f || canvasRect.rect.width <= 0 || canvasRect.rect.height <= 0) return;
             lastCanvasSize = canvasRect.rect.size;
-            screenRoot.sizeDelta = lastCanvasSize;
-            screenRoot.position = canvasRect.position;
-            screenRoot.rotation = canvasRect.rotation;
-            Vector3 desired = canvasRect.lossyScale;
-            screenRoot.localScale = new Vector3(desired.x / parentScale.x, desired.y / parentScale.y, desired.z / parentScale.z);
+            lastSafeArea = Screen.safeArea;
+            PomoVisualStyle.FitOverlay(screenRoot, canvasRect);
         }
 
         public void Refresh()
@@ -125,6 +124,7 @@ namespace Pomo.Presentation.Screens
                 confirmationText.text = "";
             double max = 0;
             foreach (var slot in current.slots) max = Math.Max(max, slot.workedSeconds);
+            int visibleCount = Mathf.Min(bars.Length, current.slots.Count);
             for (int i = 0; i < bars.Length; i++)
             {
                 bool visible = i < current.slots.Count;
@@ -137,13 +137,25 @@ namespace Pomo.Presentation.Screens
                 rect.anchorMax = new Vector2((i + 1) * width, 1);
                 rect.offsetMin = new Vector2(3, 0);
                 rect.offsetMax = new Vector2(-3, 0);
-                // Units are in the legend: each column contains minutes, blocks, then its start hour.
                 bars[i].label.text = $"{slot.startHour:00}";
                 bars[i].value.text = $"{slot.Minutes:0}\n{slot.sessionCount}";
-                bars[i].fill.anchorMax = new Vector2(1, max > 0 ? (float)(slot.workedSeconds / max) : 0);
                 float ratio = max > 0 ? (float)(slot.workedSeconds / max) : 0;
-                bars[i].image.color = slot.highestActivity ? peakColor :
-                    Color.Lerp(activityColor, new Color(0f, .7f, .73f), ratio);
+                bars[i].fill.anchorMax = new Vector2(1, ratio);
+                bars[i].image.enabled = ratio > 0;
+                bars[i].image.color = !current.recommendation.hasEnoughData ? activityColor :
+                    slot.highestActivity ? peakColor : Color.Lerp(activityColor, PomoVisualStyle.Turquoise, ratio);
+                chartRatios[i] = ratio;
+                chartHours[i] = slot.startHour;
+            }
+            if (visibleCount > 0)
+            {
+                if (plot == null)
+                {
+                    var overlay = PomoVisualStyle.Rect("Curva e indicadores", bars[0].root.transform.parent, Vector2.zero, Vector2.one);
+                    plot = overlay.gameObject.AddComponent<RhythmPlot>();
+                    plot.raycastTarget = false;
+                }
+                plot.SetSamples(chartRatios, chartHours, visibleCount, max > 0);
             }
             RecommendationChanged?.Invoke(current.recommendation);
         }
@@ -155,12 +167,15 @@ namespace Pomo.Presentation.Screens
             foreach (var bar in bars)
             {
                 if (bar == null || bar.label == null || bar.value == null || bar.fill == null) continue;
-                ConfigureChartText(bar.label, hourly ? 28 : 42, hourly ? 24 : 36, 0, .15f);
-                ConfigureChartText(bar.value, hourly ? 28 : 42, hourly ? 16 : 24, .17f, .49f);
+                ConfigureChartText(bar.label, hourly ? 29 : 42, 10, .075f, .20f);
+                ConfigureChartText(bar.value, hourly ? 25 : 36, 10, .20f, .40f);
                 var track = (RectTransform)bar.fill.parent;
-                track.anchorMin = new Vector2(.12f, .52f);
-                track.anchorMax = new Vector2(.88f, .97f);
+                track.anchorMin = new Vector2(.10f, RhythmPlot.Baseline);
+                track.anchorMax = new Vector2(.90f, RhythmPlot.Ceiling);
                 track.offsetMin = track.offsetMax = Vector2.zero;
+                Image trackImage = track.GetComponent<Image>();
+                if (trackImage != null) trackImage.enabled = false;
+                PomoVisualStyle.Round(bar.image, 38);
             }
         }
 
@@ -205,6 +220,23 @@ namespace Pomo.Presentation.Screens
             if (nextGuideLabel != null) nextGuideLabel.text = guideStep == 0 ? "Conocer más" :
                 guideStep == 4 ? "Ver gráfica" : "Continuar";
             if (guideDetails != null) guideDetails.SetActive(guideStep == 3);
+            if (guideDetails != null && guideDetails.transform.parent == messageText.transform.parent)
+            {
+                bool expanded = guideStep == 3 && !skipped;
+                PomoVisualStyle.Bounds((RectTransform)introduction.transform, new Vector2(.045f, .083f),
+                    new Vector2(.955f, expanded ? .48f : .383f));
+                PomoVisualStyle.Bounds((RectTransform)messageText.transform.parent, new Vector2(0f, expanded ? .36f : .45f),
+                    new Vector2(1f, .99f));
+                Transform mascot = introduction.transform.Find("Pomo provisional");
+                if (mascot is RectTransform mascotRect)
+                    PomoVisualStyle.Bounds(mascotRect, new Vector2(.015f, 0f), new Vector2(.46f, expanded ? .33f : .43f));
+                detailsText.gameObject.SetActive(!expanded);
+                daysText.gameObject.SetActive(!expanded);
+                PomoVisualStyle.Bounds(messageText.rectTransform, new Vector2(.04f, guideStep == 3 ? .33f : .07f),
+                    new Vector2(.96f, guideStep == 0 ? .95f : .80f));
+                PomoVisualStyle.FitText(messageText, 30, 62);
+                PomoVisualStyle.FitText(trendText, 29, 37);
+            }
             confirmationText.gameObject.SetActive(guideStep != 3);
             if (nextGuideLabel != null) nextGuideLabel.transform.parent.gameObject.SetActive(true);
             createReminderButton.gameObject.SetActive(true);
@@ -221,7 +253,7 @@ namespace Pomo.Presentation.Screens
                 case 2:
                     messageText.text = current.recommendation.hasEnoughData
                         ? $"De {hours} registras más minutos. El verde indica actividad, no energía."
-                        : "Faltan sesiones para sugerir horarios. Las franjas sin datos aparecen en gris.";
+                        : "Faltan sesiones para sugerir horarios. Las franjas sin datos aparecen en azul claro.";
                     break;
                 case 3:
                     messageText.text = current.sessionCount == 0

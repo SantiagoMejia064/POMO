@@ -26,11 +26,7 @@ public class PomoNotifications : MonoBehaviour
 
         posicionVisible = panelNotificacion.anchoredPosition;
 
-        // Ocultar el panel completamente por encima de la pantalla.
-        posicionOculta = posicionVisible +
-            Vector2.up * (panelNotificacion.rect.height + distanciaExtra);
-
-        panelNotificacion.anchoredPosition = posicionOculta;
+        panelNotificacion.gameObject.SetActive(false);
     }
 
     public void MostrarRecordatorio()
@@ -41,6 +37,9 @@ public class PomoNotifications : MonoBehaviour
         if (rutinaActual != null)
             StopCoroutine(rutinaActual);
 
+        posicionOculta = posicionVisible + Vector2.up * (panelNotificacion.rect.height + distanciaExtra);
+        panelNotificacion.anchoredPosition = posicionOculta;
+        panelNotificacion.gameObject.SetActive(true);
         rutinaActual = StartCoroutine(AnimacionNotificacion());
     }
 
@@ -57,6 +56,7 @@ public class PomoNotifications : MonoBehaviour
         // Subir el panel
         yield return Animar(posicionVisible, posicionOculta);
 
+        panelNotificacion.gameObject.SetActive(false);
         rutinaActual = null;
     }
 

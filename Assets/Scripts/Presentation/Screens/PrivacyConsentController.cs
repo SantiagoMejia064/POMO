@@ -11,7 +11,7 @@ namespace Pomo.Presentation.Screens
     public sealed class PrivacyConsentController : MonoBehaviour
     {
         public const string AcceptedVersionKey = "pomo.privacy.accepted-version";
-        // Version 2 invalidates previous local onboarding data for this test cycle.
+        // The version was previously set to 4 for testing with the same notice.
         public const int NoticeVersion = 2;
 
         [SerializeField, InspectorName("Contenido de bienvenida")] private CanvasGroup welcomeContent;
@@ -36,7 +36,14 @@ namespace Pomo.Presentation.Screens
 
         [SerializeField] private NombreBienvenidaController nombreBienvenida;
 
-        public bool HasAccepted => PlayerPrefs.GetInt(AcceptedVersionKey, 0) == NoticeVersion;
+        public bool HasAccepted
+        {
+            get
+            {
+                int savedVersion = PlayerPrefs.GetInt(AcceptedVersionKey, 0);
+                return savedVersion == NoticeVersion || (NoticeVersion == 2 && savedVersion == 4);
+            }
+        }
         public bool IsBlockingWelcome => consentPanel != null && consentPanel.activeInHierarchy;
 
         private void OnEnable()
@@ -89,8 +96,8 @@ namespace Pomo.Presentation.Screens
             PlayerPrefs.SetInt(AcceptedVersionKey, NoticeVersion);
             PlayerPrefs.Save();
             acceptedInCurrentOpening = true;
-            if (nombreBienvenida != null) nombreBienvenida.PrepararEntrada();
             ApplyGate(false);
+            if (nombreBienvenida != null) nombreBienvenida.RestaurarEntrada();
         }
 
         public void OpenTerms()
