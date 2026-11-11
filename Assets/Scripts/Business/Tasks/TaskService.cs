@@ -99,7 +99,7 @@ namespace Pomo.Business.Tasks
             taskRepository.Reload();
             try { taskRepository.Add(newTask); }
             catch (LocalDataWriteException) { return null; }
-            ScheduleTaskReminder(newTask);
+            ScheduleTaskReminders(newTask);
             return newTask;
         }
 
@@ -144,7 +144,9 @@ namespace Pomo.Business.Tasks
             }
 
             int previousReminderId = task.reminderNotificationId;
+            int previousEncouragementId = task.encouragementNotificationId;
             task.reminderNotificationId = NotificationService.NoNotificationId;
+            task.encouragementNotificationId = NotificationService.NoNotificationId;
             task.title = title.Trim();
             task.description = description == null ? string.Empty : description.Trim();
             task.subject = subject.Trim();
@@ -155,10 +157,17 @@ namespace Pomo.Business.Tasks
                 return null;
             }
 
-            notificationService.CancelTaskReminder(new TaskModel { reminderNotificationId = previousReminderId });
+            // Keep IDs that Android could not cancel so a later edit or completion
+            // can retry instead of scheduling a duplicate.
+            if (previousReminderId > 0 && !notificationService.CancelTaskReminder(previousReminderId))
+                task.reminderNotificationId = previousReminderId;
+            if (previousEncouragementId > 0 && !notificationService.CancelTaskReminder(previousEncouragementId))
+                task.encouragementNotificationId = previousEncouragementId;
+            if (task.reminderNotificationId > 0 || task.encouragementNotificationId > 0)
+                TrySaveTask(task);
             if (task.status != TaskStatus.Completed)
             {
-                ScheduleTaskReminder(task);
+                ScheduleTaskReminders(task);
             }
 
             return task;
@@ -179,6 +188,7 @@ namespace Pomo.Business.Tasks
             if (deleted)
             {
                 notificationService.CancelTaskReminder(task);
+                notificationService.CancelTaskReminder(task.encouragementNotificationId);
                 notificationService.NotifyAfterSecondTaskDeletedToday();
             }
 
@@ -256,18 +266,22 @@ namespace Pomo.Business.Tasks
                 return TaskStatusTransitionResult.SaveFailed;
             }
 
-            if (targetStatus == TaskStatus.Completed)
-                PomoReactionService.NotifyTaskCompleted(task.id, task.title, task.completedAt);
-
-            if (targetStatus == TaskStatus.Completed && notificationService.CancelTaskReminder(task))
+            if (targetStatus == TaskStatus.InProgress)
             {
-                task.reminderNotificationId = NotificationService.NoNotificationId;
-                TrySaveTask(task);
+                notificationService.RefreshPendingTaskEncouragement(task);
             }
-
-            if (targetStatus == TaskStatus.Completed && CountTasksCompletedToday() == 2)
+            else if (targetStatus == TaskStatus.Completed)
             {
-                notificationService.NotifyDailyGoalsAlmostCompleted();
+                PomoReactionService.NotifyTaskCompleted(task.id, task.title, task.completedAt);
+                bool cancelledDeadline = notificationService.CancelTaskReminder(task);
+                bool cancelledEncouragement = notificationService.CancelTaskReminder(task.encouragementNotificationId);
+                if (cancelledDeadline) task.reminderNotificationId = NotificationService.NoNotificationId;
+                if (cancelledEncouragement) task.encouragementNotificationId = NotificationService.NoNotificationId;
+                if (cancelledDeadline || cancelledEncouragement) TrySaveTask(task);
+
+                int completedToday = CountTasksCompletedToday();
+                if (completedToday == 1) notificationService.NotifyTaskProgress(task.title);
+                if (completedToday == 2) notificationService.NotifyDailyGoalsAlmostCompleted();
             }
 
             return TaskStatusTransitionResult.Success;
@@ -295,25 +309,28 @@ namespace Pomo.Business.Tasks
             TaskModel task = taskRepository.GetById(taskId);
             if (task == null || task.status == TaskStatus.Completed) return false;
             if (task.reminderNotificationId > 0) return true;
-            ScheduleTaskReminder(task);
+            ScheduleTaskReminders(task);
             return task.reminderNotificationId > 0;
         }
 
-        private void ScheduleTaskReminder(TaskModel task)
+        private void ScheduleTaskReminders(TaskModel task)
         {
-            int notificationId = notificationService.ScheduleTaskReminder(task);
+            int deadlineId = task.reminderNotificationId <= 0
+                ? notificationService.ScheduleTaskReminder(task)
+                : NotificationService.NoNotificationId;
+            int encouragementId = task.encouragementNotificationId <= 0
+                ? notificationService.ScheduleTaskEncouragement(task)
+                : NotificationService.NoNotificationId;
 
-            if (notificationId <= 0)
-            {
-                return;
-            }
+            if (deadlineId <= 0 && encouragementId <= 0) return;
+            if (deadlineId > 0) task.reminderNotificationId = deadlineId;
+            if (encouragementId > 0) task.encouragementNotificationId = encouragementId;
+            if (TrySaveTask(task)) return;
 
-            task.reminderNotificationId = notificationId;
-            if (!TrySaveTask(task))
-            {
-                notificationService.CancelTaskReminder(task);
-                task.reminderNotificationId = NotificationService.NoNotificationId;
-            }
+            notificationService.CancelTaskReminder(deadlineId);
+            notificationService.CancelTaskReminder(encouragementId);
+            if (deadlineId > 0) task.reminderNotificationId = NotificationService.NoNotificationId;
+            if (encouragementId > 0) task.encouragementNotificationId = NotificationService.NoNotificationId;
         }
 
         private bool TrySaveTask(TaskModel task)

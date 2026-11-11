@@ -5,6 +5,7 @@ using Pomo.Data.Models;
 using Pomo.Data.Repositories;
 using Pomo.Business.Tasks;
 using Pomo.Business.Pomo;
+using Pomo.ServicesAdapters.Notifications;
 using Pomo.Shared.Enums;
 using Pomo.Shared.Utilities;
 
@@ -21,6 +22,8 @@ namespace Pomo.Business.Progress
         public const int MinimumTaskTrophyReward = 50;
         public const int MaximumTaskTrophyReward = 300;
         public const int CompletedFocusBlockCupsReward = 20;
+        private const int ConsecutiveBlockCount = 3;
+        private static readonly TimeSpan MaximumGapBetweenBlocks = TimeSpan.FromMinutes(30);
 
         public static event Action<int> CupsBalanceChanged;
         public static event Action StudySessionsChanged;
@@ -190,10 +193,40 @@ namespace Pomo.Business.Progress
             // Solo el primer guardado de una sesión completada publica el logro.
             // Las sesiones interrumpidas siguen actualizando las métricas existentes.
             PomoReactionService.NotifyFocusBlockCompleted(session);
+            if (!session.interrupted && HasConsecutiveFocusBlocks(day))
+                new NotificationService().NotifyConsecutiveFocusBlocks();
             StudySessionsChanged?.Invoke();
             if (!session.interrupted && completionCups > 0)
                 CupsBalanceChanged?.Invoke(GetCupsBalance());
             return day;
+        }
+
+        private static bool HasConsecutiveFocusBlocks(DailyProgressModel day)
+        {
+            var blocks = day.completedBlocks;
+            if (blocks == null || blocks.Count < ConsecutiveBlockCount) return false;
+
+            int firstIndex = blocks.Count - ConsecutiveBlockCount;
+            DateTimeOffset firstEnd = default;
+            DateTimeOffset previousEnd = default;
+            for (int i = firstIndex; i < blocks.Count; i++)
+            {
+                var block = blocks[i];
+                if (block == null || block.interrupted ||
+                    !DateUtils.TryParseStoredDate(block.startedAt, out var start) ||
+                    !DateUtils.TryParseStoredDate(block.completedAt, out var end) || end <= start)
+                    return false;
+
+                if (i == firstIndex) firstEnd = end;
+                else if (start < previousEnd || start - previousEnd > MaximumGapBetweenBlocks)
+                    return false;
+
+                previousEnd = end;
+            }
+
+            return day.interruptedBlocks == null || !day.interruptedBlocks.Exists(block =>
+                block != null && DateUtils.TryParseStoredDate(block.completedAt, out var end) &&
+                end > firstEnd && end <= previousEnd);
         }
 
         public DailyProgressModel RecordCompletedFocusBlock(

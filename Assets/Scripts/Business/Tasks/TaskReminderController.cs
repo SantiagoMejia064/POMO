@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Pomo.Business.Tasks;
 using Pomo.Data.Models;
+using Pomo.ServicesAdapters.Notifications;
 using Pomo.Shared.Enums;
 using Pomo.Shared.Utilities;
 
@@ -18,6 +19,7 @@ public class TaskReminderController : MonoBehaviour
     [SerializeField] private float tiempoEspera = 5f;
 
     private TaskService taskService;
+    private NotificationService notifications;
 
     // Evita mostrar varias veces la misma tarea
     private readonly HashSet<string> avisosMostrados =
@@ -30,6 +32,7 @@ public class TaskReminderController : MonoBehaviour
     private void Start()
     {
         taskService = new TaskService();
+        notifications = new NotificationService();
 
         StartCoroutine(RevisarTareas());
     }
@@ -48,7 +51,7 @@ public class TaskReminderController : MonoBehaviour
 
     private void ComprobarTareas()
     {
-        if (notificationUI == null)
+        if (notificationUI == null && !notifications.IsAndroidDevice)
         {
             Debug.LogError(
                 "POMO: No asignaste PomoNotifications."
@@ -150,11 +153,15 @@ public class TaskReminderController : MonoBehaviour
 
         avisosMostrados.Add(clave);
 
+        if (notifications.PermissionState == NotificationAccessState.Allowed &&
+            taskService.TryScheduleReminderForTask(taskId))
+            yield break;
+
         Debug.Log(
             "POMO: MOSTRANDO NOTIFICACIÓN DE " +
             tarea.title
         );
 
-        notificationUI.MostrarRecordatorio();
+        if (notificationUI != null) notificationUI.MostrarRecordatorio();
     }
 }

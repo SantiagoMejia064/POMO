@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Text;
 using Pomo.Business.Pomodoro;
 using Pomo.Business.Progress;
 using Pomo.Business.Tasks;
@@ -114,6 +115,55 @@ namespace Pomo.Presentation.Screens
         {
             taskService = new TaskService();
             progressService = new ProgressService();
+            if (dueDateInput != null) dueDateInput.onValueChanged.AddListener(FormatCreateDueDate);
+            if (editDueDateInput != null) editDueDateInput.onValueChanged.AddListener(FormatEditDueDate);
+        }
+
+        private void OnDestroy()
+        {
+            if (dueDateInput != null) dueDateInput.onValueChanged.RemoveListener(FormatCreateDueDate);
+            if (editDueDateInput != null) editDueDateInput.onValueChanged.RemoveListener(FormatEditDueDate);
+        }
+
+        private void FormatCreateDueDate(string value) => FormatDueDateInput(dueDateInput, value);
+
+        private void FormatEditDueDate(string value) => FormatDueDateInput(editDueDateInput, value);
+
+        private static void FormatDueDateInput(TMP_InputField input, string value)
+        {
+            int originalCaret = Mathf.Clamp(input.stringPosition, 0, value.Length);
+            int formattedCaret = 0;
+            int digitCount = 0;
+            var formatted = new StringBuilder(DateUtils.UiDateFormat.Length);
+
+            for (int i = 0; i < value.Length && digitCount < 8; i++)
+            {
+                char character = value[i];
+                if (character < '0' || character > '9') continue;
+
+                // Insert a separator when the next part begins. This lets a
+                // backspace remove the last digit without leaving a trailing slash.
+                if (digitCount == 2 || digitCount == 4) formatted.Append('/');
+                formatted.Append(character);
+                digitCount++;
+                if (i < originalCaret) formattedCaret = formatted.Length;
+            }
+
+            string formattedDate = formatted.ToString();
+            if (formattedDate == value) return;
+
+            // Keep the caret beside the same digit when editing within the date.
+            if (originalCaret > 0 && value[originalCaret - 1] == '/' &&
+                formattedCaret < formattedDate.Length && formattedDate[formattedCaret] == '/')
+                formattedCaret++;
+
+            input.SetTextWithoutNotify(formattedDate);
+            if (!input.isFocused) return;
+
+            input.stringPosition = formattedCaret;
+            var keyboard = input.touchScreenKeyboard;
+            if (keyboard != null && keyboard.active && keyboard.canSetSelection)
+                keyboard.selection = new RangeInt(formattedCaret, 0);
         }
 
         private void Start()
@@ -212,7 +262,7 @@ namespace Pomo.Presentation.Screens
             if (permisosNotificaciones == null || !new NotificationService().IsAndroidDevice ||
                 task == null || task.reminderNotificationId > 0 || task.status == TaskStatus.Completed ||
                 !DateUtils.TryParseStoredDate(task.dueDate, out DateTimeOffset due) ||
-                due.LocalDateTime.Date.AddHours(9) <= DateTime.Now) yield break;
+                due.LocalDateTime.Date < DateTime.Today) yield break;
             bool permitido = false;
             yield return permisosNotificaciones.SolicitarNotificaciones(
                 "POMO puede avisarte el día de vencimiento de tu tarea. La tarea ya está guardada: si no permites notificaciones, podrás seguir consultándola y editándola sin ese aviso.",
@@ -793,7 +843,9 @@ namespace Pomo.Presentation.Screens
 
         private void ShowDueSoonNotification(TaskModel task)
         {
-            if (notificationUI == null || task == null)
+            // Android uses the scheduled system alert. The due-day controller
+            // can still show the in-app reminder if native delivery is unavailable.
+            if (notificationUI == null || task == null || new NotificationService().IsAndroidDevice)
             {
                 return;
             }

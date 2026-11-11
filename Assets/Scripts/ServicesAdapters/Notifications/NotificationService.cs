@@ -1,5 +1,7 @@
 using System;
 using Pomo.Data.Models;
+using Pomo.Shared.Constants;
+using Pomo.Shared.Enums;
 using Pomo.Shared.Utilities;
 using UnityEngine;
 
@@ -12,9 +14,8 @@ namespace Pomo.ServicesAdapters.Notifications
     public enum RhythmNotificationResult { Scheduled, EditorPreview, PermissionPending, Failed }
     public enum NotificationAccessState { Unsupported, NotRequested, Pending, Allowed, Denied }
     /// <summary>
-    /// Schedules device-local reminders for task deadlines. The task form only
-    /// collects a date, so reminders are consistently delivered at 09:00 local
-    /// time on that date.
+    /// Delivers local Android notifications for task deadlines, study reminders
+    /// and milestones. The app's visual feedback has its own presentation flow.
     /// </summary>
     public class NotificationService
     {
@@ -31,21 +32,24 @@ namespace Pomo.ServicesAdapters.Notifications
         }
 
         private const int ReminderHour = 9;
+        private const int EncouragementHour = 18;
         private const string TaskReminderChannelId = "pomo-task-reminders";
         private const string CycleReminderChannelId = "pomo-cycle-reminders";
         private const string QuietBreakChannelId = "pomo-break-history";
         private const string RhythmChannelId = "pomo-rhythm-reminders";
+        private const string EncouragementChannelId = "pomo-encouragement";
 
-        // These are the IDs configured in Edit > Project Settings > Mobile Notifications.
-        // Leave them empty until the POMO icons have been added there; Android then uses
-        // the application's default icon.
+        // Drawable IDs registered in Project Settings > Mobile Notifications.
         private const string PomoSmallIconId = "pomo_small";
         private const string PomoLargeIconId = "pomo_large";
         // All POMO notifications share the same status-bar icon. Each message
         // can still use its own large illustration in the notification drawer.
-        private const string DailyGoalsSmallIconId = "pomo_small";
         private const string DailyGoalsLargeIconId = "pomo_goals_large";
         private const string DeletedTasksLargeIconId = "pomo_delete_large";
+        private const string EncouragementLargeIconId = "pomo_encouragement_large";
+        private const string EffortLargeIconId = "pomo_effort_large";
+        private const string DisciplineLargeIconId = "pomo_discipline_large";
+        private const string BreakLargeIconId = "pomo_break_large";
         private const string DeletedTasksDateKey = "pomo.deleted-tasks.date";
         private const string DeletedTasksCountKey = "pomo.deleted-tasks.count";
 
@@ -157,8 +161,10 @@ namespace Pomo.ServicesAdapters.Notifications
                 if (AndroidNotificationCenter.CheckScheduledNotificationStatus(reminder.notificationId) != NotificationStatus.Scheduled)
                     AndroidNotificationCenter.SendNotificationWithExplicitID(new AndroidNotification
                     {
-                        Title = "Es tu momento de estudiar", Text = reminder.name,
-                        FireTime = scheduled.LocalDateTime, ShouldAutoCancel = true
+                        Title = "25 minutos contigo y luego descanso.",
+                        Text = reminder.name,
+                        FireTime = scheduled.LocalDateTime, ShouldAutoCancel = true,
+                        SmallIcon = PomoSmallIconId, LargeIcon = PomoLargeIconId
                     }, RhythmChannelId, reminder.notificationId);
 
                 if (AndroidNotificationCenter.CheckScheduledNotificationStatus(reminder.notificationId) == NotificationStatus.Scheduled)
@@ -202,34 +208,34 @@ namespace Pomo.ServicesAdapters.Notifications
 #endif
 
         /// <summary>
-        /// Schedules one Android notification for the given task. A past due
-        /// date is deliberately not scheduled because Android would show it
-        /// immediately, rather than as a useful reminder.
+        /// Schedules an Android reminder on the due date. Tasks for today can
+        /// also be scheduled after the usual reminder hour.
         /// </summary>
         public int ScheduleTaskReminder(TaskModel task)
         {
-            if (task == null || !DateUtils.TryParseStoredDate(task.dueDate, out DateTimeOffset dueDate))
+            if (task == null || task.status == TaskStatus.Completed ||
+                !DateUtils.TryParseStoredDate(task.dueDate, out DateTimeOffset dueDate))
             {
                 Debug.LogWarning("No se pudo programar el recordatorio: la tarea no tiene una fecha válida.");
                 return NoNotificationId;
             }
 
-            DateTime fireTime = dueDate.LocalDateTime.Date.AddHours(ReminderHour);
-
-            if (fireTime <= DateTime.Now)
-            {
-                Debug.Log($"No se programó recordatorio para \"{task.title}\": las 09:00 del día límite ya pasaron.");
-                return NoNotificationId;
-            }
+            DateTime now = DateTime.Now;
+            DateTime dueDay = dueDate.LocalDateTime.Date;
+            if (dueDay < now.Date) return NoNotificationId;
+            DateTime fireTime = dueDay.AddHours(ReminderHour);
+            if (fireTime < now) fireTime = now;
 
 #if UNITY_ANDROID && !UNITY_EDITOR
 
             AndroidNotification notification = new AndroidNotification
             {
-                Title = "Tienes una tarea pendiente",
+                Title = "Ah, claro… la tarea seguro se hace por telepatía.",
                 Text = $"{task.title} vence hoy.",
                 FireTime = fireTime,
-                ShouldAutoCancel = true
+                ShouldAutoCancel = true,
+                SmallIcon = PomoSmallIconId,
+                LargeIcon = DeletedTasksLargeIconId
             };
 
             int notificationId = SendNotificationSafely(notification, TaskReminderChannelId);
@@ -248,6 +254,56 @@ namespace Pomo.ServicesAdapters.Notifications
 #endif
         }
 
+        public int ScheduleTaskEncouragement(TaskModel task)
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            if (TryBuildTaskEncouragement(task, out var notification))
+                return SendNotificationSafely(notification, EncouragementChannelId);
+#endif
+            return NoNotificationId;
+        }
+
+        public void RefreshPendingTaskEncouragement(TaskModel task)
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            int id = task.encouragementNotificationId;
+            if (id <= 0 || !TryBuildTaskEncouragement(task, out var notification) ||
+                PermissionState != NotificationAccessState.Allowed) return;
+            try
+            {
+                if (AndroidNotificationCenter.CheckScheduledNotificationStatus(id) == NotificationStatus.Scheduled)
+                    AndroidNotificationCenter.SendNotificationWithExplicitID(notification, EncouragementChannelId, id);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("POMO: no se pudo actualizar el aviso de ánimo. " + exception.Message);
+            }
+#endif
+        }
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+        private static bool TryBuildTaskEncouragement(TaskModel task, out AndroidNotification notification)
+        {
+            notification = default;
+            if (task == null || task.status == TaskStatus.Completed ||
+                !DateUtils.TryParseStoredDate(task.dueDate, out DateTimeOffset dueDate)) return false;
+
+            DateTime fireTime = dueDate.LocalDateTime.Date.AddDays(-1).AddHours(EncouragementHour);
+            if (fireTime <= DateTime.Now) return false;
+            bool inProgress = task.status == TaskStatus.InProgress;
+            notification = new AndroidNotification
+            {
+                Title = inProgress ? "Un tomate creyó en ti hoy." : "Tu yo de mañana te agradecería que empieces hoy.",
+                Text = inProgress ? $"Puedes dar el siguiente paso con «{task.title}»." : $"«{task.title}» vence mañana.",
+                FireTime = fireTime,
+                ShouldAutoCancel = true,
+                SmallIcon = PomoSmallIconId,
+                LargeIcon = EncouragementLargeIconId
+            };
+            return true;
+        }
+#endif
+
         /// <summary>
         /// Notifies the user when a focus phase ends and the break begins.
         /// In the Editor and on other platforms, logs the event for verification.
@@ -262,10 +318,12 @@ namespace Pomo.ServicesAdapters.Notifications
 
             AndroidNotification notification = new AndroidNotification
             {
-                Title = "¡Buen trabajo! Tómate un descanso",
+                Title = "Pomo tiene sed. ¿Le das unas gotitas?",
                 Text = notificationText,
                 FireTime = DateTime.Now.AddSeconds(1),
-                ShouldAutoCancel = true
+                ShouldAutoCancel = true,
+                SmallIcon = PomoSmallIconId,
+                LargeIcon = BreakLargeIconId
             };
 
             int notificationId = SendNotificationSafely(notification, quiet ? QuietBreakChannelId : CycleReminderChannelId);
@@ -326,29 +384,45 @@ namespace Pomo.ServicesAdapters.Notifications
         /// </summary>
         public int NotifyDailyGoalsAlmostCompleted()
         {
-#if UNITY_ANDROID && !UNITY_EDITOR
+            return NotifyOnceToday(AppConstants.GoalsNoticeDateKey, "Ya casi completas tus objetivos del día.",
+                "Ya completaste dos tareas hoy. ¡Sigue así!", DailyGoalsLargeIconId);
+        }
 
-            AndroidNotification notification = new AndroidNotification
+        public int NotifyTaskProgress(string taskTitle)
+        {
+            return NotifyOnceToday(AppConstants.EffortNoticeDateKey, "Tu esfuerzo ya se nota.",
+                $"Completaste «{taskTitle}». ¡Buen trabajo!", EffortLargeIconId);
+        }
+
+        public int NotifyConsecutiveFocusBlocks()
+        {
+            return NotifyOnceToday(AppConstants.DisciplineNoticeDateKey, "Llevas varios bloques seguidos.",
+                "Eso ya es disciplina.", DisciplineLargeIconId);
+        }
+
+        private int NotifyOnceToday(string key, string title, string message, string largeIcon)
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            string today = DateTime.Now.ToString("yyyy-MM-dd");
+            if (PlayerPrefs.GetString(key, string.Empty) == today) return NoNotificationId;
+
+            int id = SendNotificationSafely(new AndroidNotification
             {
-                Title = "YA CASI COMPLETAS TUS OBJETIVOS DEL DIA",
-                Text = "Ya completaste dos tareas hoy. Sigue asi, tu puedes!",
+                Title = title,
+                Text = message,
                 FireTime = DateTime.Now.AddSeconds(1),
                 ShouldAutoCancel = true,
-                SmallIcon = DailyGoalsSmallIconId,
-                LargeIcon = DailyGoalsLargeIconId
-            };
-
-            int notificationId = SendNotificationSafely(notification, CycleReminderChannelId);
-            if (notificationId > 0)
+                SmallIcon = PomoSmallIconId,
+                LargeIcon = largeIcon
+            }, EncouragementChannelId);
+            if (id > 0)
             {
-                Debug.Log($"POMO DEBUG: notificacion de objetivos diarios programada (ID {notificationId}).");
-                return notificationId;
+                PlayerPrefs.SetString(key, today);
+                PlayerPrefs.Save();
             }
-
-            Debug.LogWarning("Android no pudo programar la notificacion de objetivos diarios.");
-            return NoNotificationId;
+            return id;
 #else
-            Debug.Log("POMO DEBUG: simulacion en Editor. Se mostraria: YA CASI COMPLETAS TUS OBJETIVOS DEL DIA.");
+            Debug.Log($"POMO: aviso preparado: {title}");
             return NoNotificationId;
 #endif
         }
@@ -380,15 +454,15 @@ namespace Pomo.ServicesAdapters.Notifications
 
             AndroidNotification notification = new AndroidNotification
             {
-                Title = "Si claro, ma\u00F1ana empiezas...",
-                Text = "\"Como ayer\"",
+                Title = "Sí, claro, mañana sí empiezas.",
+                Text = "Como ayer.",
                 FireTime = DateTime.Now.AddSeconds(1),
                 ShouldAutoCancel = true,
                 SmallIcon = PomoSmallIconId,
                 LargeIcon = DeletedTasksLargeIconId
             };
 
-            int notificationId = SendNotificationSafely(notification, CycleReminderChannelId);
+            int notificationId = SendNotificationSafely(notification, EncouragementChannelId);
             if (notificationId > 0)
             {
                 Debug.Log($"POMO DEBUG: notificacion por dos tareas eliminadas programada (ID {notificationId}).");
@@ -408,17 +482,17 @@ namespace Pomo.ServicesAdapters.Notifications
         /// </summary>
         public bool CancelTaskReminder(TaskModel task)
         {
-            if (task == null || task.reminderNotificationId <= 0)
-            {
-                return false;
-            }
+            return CancelTaskReminder(task?.reminderNotificationId ?? NoNotificationId);
+        }
 
+        public bool CancelTaskReminder(int id)
+        {
+            if (id <= 0) return false;
 #if UNITY_ANDROID && !UNITY_EDITOR
             try
             {
-                AndroidNotificationCenter.CancelScheduledNotification(task.reminderNotificationId);
-                AndroidNotificationCenter.CancelDisplayedNotification(task.reminderNotificationId);
-                Debug.Log($"Recordatorio cancelado para \"{task.title}\".");
+                AndroidNotificationCenter.CancelScheduledNotification(id);
+                AndroidNotificationCenter.CancelDisplayedNotification(id);
                 return true;
             }
             catch (Exception exception)
@@ -427,7 +501,6 @@ namespace Pomo.ServicesAdapters.Notifications
                 return false;
             }
 #else
-            Debug.Log($"El recordatorio de \"{task.title}\" se cancelará en Android al completar la tarea.");
             return false;
 #endif
         }
@@ -469,6 +542,15 @@ namespace Pomo.ServicesAdapters.Notifications
             try
             {
                 if (channelId == TaskReminderChannelId) EnsureNotificationChannel();
+                else if (channelId == EncouragementChannelId)
+                    AndroidNotificationCenter.RegisterNotificationChannel(new AndroidNotificationChannel
+                    {
+                        Id = EncouragementChannelId,
+                        Name = "Mensajes de Pomo",
+                        Description = "Sugerencias y reconocimientos de Pomo.",
+                        Importance = Importance.Low,
+                        EnableVibration = false
+                    });
                 else if (channelId == QuietBreakChannelId)
                     AndroidNotificationCenter.RegisterNotificationChannel(new AndroidNotificationChannel
                     {

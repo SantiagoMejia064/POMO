@@ -9,5 +9,8 @@ namespace Pomo.Shared.Constants
         public const string RhythmRemindersFileName = "rhythm-reminders.json";
         public const string AudioPreferenceKey = "Pomo_AudioEnabled";
         public const string VibrationPreferenceKey = "pomo.feedback.vibration";
+        public const string EffortNoticeDateKey = "pomo.notice.effort.date";
+        public const string GoalsNoticeDateKey = "pomo.notice.goals.date";
+        public const string DisciplineNoticeDateKey = "pomo.notice.discipline.date";
     }
 }

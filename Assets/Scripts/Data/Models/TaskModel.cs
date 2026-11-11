@@ -29,5 +29,6 @@ namespace Pomo.Data.Models
         // Android assigns this identifier when the local deadline reminder is
         // scheduled. -1 means that the task does not have a scheduled reminder.
         public int reminderNotificationId = -1;
+        public int encouragementNotificationId = -1;
     }
 }

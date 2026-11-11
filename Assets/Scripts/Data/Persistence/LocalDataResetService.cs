@@ -20,6 +20,7 @@ namespace Pomo.Data.Persistence
             var keys = new List<string> {
                 AppConstants.AudioPreferenceKey, AppConstants.VibrationPreferenceKey,
                 "pomo.deleted-tasks.date", "pomo.deleted-tasks.count",
+                AppConstants.EffortNoticeDateKey, AppConstants.GoalsNoticeDateKey, AppConstants.DisciplineNoticeDateKey,
                 "pomo.privacy.accepted-version", LocalUserProfile.NameKey, LocalUserProfile.OnboardingKey
             };
             for (int i = 0; i < LocalUserProfile.HealthyHabitCount; i++)
