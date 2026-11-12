@@ -35,8 +35,16 @@ namespace Pomo.Presentation.Screens
             }
         }
 
+        // =====================================================
+        // POMO NORMAL
+        // =====================================================
+
         [Header("Pomo normal")]
         [SerializeField] private GameObject normalPomo;
+
+        // =====================================================
+        // REACCIONES DE POMO
+        // =====================================================
 
         [Header("Reacciones de Pomo")]
         [SerializeField] private GameObject wellbeingPomo;
@@ -46,29 +54,63 @@ namespace Pomo.Presentation.Screens
         [SerializeField] private GameObject activityPomo;
         [SerializeField] private GameObject motivationPomo;
 
+        // =====================================================
+        // INTERFAZ DEL CONSEJO
+        // =====================================================
+
         [Header("Interfaz del consejo")]
         [SerializeField] private GameObject adviceBackground;
         [SerializeField] private TMP_Text adviceText;
+
+        // =====================================================
+        // SONIDO
+        // =====================================================
 
         [Header("Sonido")]
         [SerializeField] private AudioSource adviceAudioSource;
         [SerializeField] private AudioClip adviceSound;
 
+        // =====================================================
+        // CONFIGURACIÓN DE TIEMPO
+        // =====================================================
+
         [Header("Configuración de tiempo")]
         [SerializeField] private bool automaticAdvice = true;
+
+        [Tooltip("Tiempo de espera antes del primer consejo.")]
         [SerializeField] private float firstAdviceDelay = 30f;
+
+        [Tooltip("Intervalo entre consejos.")]
         [SerializeField] private float adviceInterval = 180f;
+
+        [Tooltip("Tiempo durante el que se muestra cada consejo.")]
         [SerializeField] private float adviceDuration = 10f;
+
+        // =====================================================
+        // CONTROL DEL PANEL
+        // =====================================================
+
+        [Header("Control de pantalla")]
+        [SerializeField] private GameObject inicioPanel;
+
+        // =====================================================
+        // HÁBITOS DEL USUARIO
+        // =====================================================
 
         [Header("Hábitos del usuario")]
         [SerializeField]
         private HealthyHabitsFeedbackController healthyHabits;
+
+        // =====================================================
+        // VARIABLES INTERNAS
+        // =====================================================
 
         private readonly List<AdviceMessage> allAdvice =
             new List<AdviceMessage>();
 
         private Coroutine adviceRoutine;
         private Coroutine currentAdvice;
+
         private string lastMessage = "";
 
         // =====================================================
@@ -92,7 +134,8 @@ namespace Pomo.Presentation.Screens
         {
             if (automaticAdvice)
             {
-                adviceRoutine = StartCoroutine(AutomaticAdviceRoutine());
+                adviceRoutine =
+                    StartCoroutine(AutomaticAdviceRoutine());
             }
         }
 
@@ -119,7 +162,9 @@ namespace Pomo.Presentation.Screens
 
         private void LoadAdvice()
         {
+            // -------------------------------------------------
             // BIENESTAR Y PROGRESO
+            // -------------------------------------------------
 
             Add(AdviceCategory.Wellbeing,
                 "Entiendo que hoy no ha sido tan fácil. Empecemos con algo pequeño.");
@@ -175,7 +220,9 @@ namespace Pomo.Presentation.Screens
             Add(AdviceCategory.Wellbeing,
                 "Tu progreso es impresionante. Sigue empujando y alcanzando nuevas metas.");
 
+            // -------------------------------------------------
             // HIDRATACIÓN
+            // -------------------------------------------------
 
             Add(AdviceCategory.Hydration,
                 "Tómate un vaso de agua, tu cuerpo también necesita apoyo para rendir mejor.");
@@ -225,7 +272,9 @@ namespace Pomo.Presentation.Screens
             Add(AdviceCategory.Hydration,
                 "Seguir hidratándote es una forma de cuidar tu mente y cuerpo. ¡No pierdas el enfoque!");
 
+            // -------------------------------------------------
             // DESCANSO Y SUEÑO
+            // -------------------------------------------------
 
             Add(AdviceCategory.Rest,
                 "Dormir bien no es perder tiempo, es prepararte para rendir mejor mañana.");
@@ -263,7 +312,9 @@ namespace Pomo.Presentation.Screens
             Add(AdviceCategory.Rest,
                 "Recuerda que descansar bien es fundamental para afrontar los retos de mañana.");
 
+            // -------------------------------------------------
             // BUENOS HÁBITOS
+            // -------------------------------------------------
 
             Add(AdviceCategory.GoodHabits,
                 "Los pequeños hábitos construyen los grandes resultados.");
@@ -295,7 +346,9 @@ namespace Pomo.Presentation.Screens
             Add(AdviceCategory.GoodHabits,
                 "Estás avanzando. Celebra tus logros, ¡aunque sean pequeños!");
 
+            // -------------------------------------------------
             // ACTIVIDAD FÍSICA
+            // -------------------------------------------------
 
             Add(AdviceCategory.Activity,
                 "¿Qué tal si te levantas un momento y estiras el cuerpo?");
@@ -339,7 +392,9 @@ namespace Pomo.Presentation.Screens
             Add(AdviceCategory.Activity,
                 "Mantén la actividad física como parte de tu rutina diaria. ¡Es un gran hábito!");
 
+            // -------------------------------------------------
             // MOTIVACIÓN SUAVE
+            // -------------------------------------------------
 
             Add(AdviceCategory.Motivation,
                 "Una tarea a la vez. Tú puedes con eso.");
@@ -384,19 +439,22 @@ namespace Pomo.Presentation.Screens
         }
 
         // =====================================================
-        // DETECTAR HÁBITOS PENDIENTES
+        // COMPROBAR SI HAY HÁBITOS PENDIENTES
         // =====================================================
 
         private bool HasPendingHabit(AdviceCategory category)
         {
             if (healthyHabits == null)
-                return true;
+                return false;
 
-            List<int> pending = healthyHabits.GetHabitsToImprove();
+            List<int> pending =
+                healthyHabits.GetHabitsToImprove();
 
             foreach (int index in pending)
             {
-                string title = healthyHabits.GetHabitTitle(index);
+                string title =
+                    healthyHabits.GetHabitTitle(index);
+
                 string description =
                     healthyHabits.GetHabitDescription(index);
 
@@ -410,6 +468,10 @@ namespace Pomo.Presentation.Screens
             return false;
         }
 
+        // =====================================================
+        // CLASIFICAR LOS HÁBITOS
+        // =====================================================
+
         private bool MatchesCategory(
             AdviceCategory category,
             string content)
@@ -417,27 +479,45 @@ namespace Pomo.Presentation.Screens
             switch (category)
             {
                 case AdviceCategory.Hydration:
+
                     return ContainsAny(content,
-                        "hidrat", "agua", "vasos de agua");
+                        "hidrat",
+                        "agua",
+                        "vasos de agua");
 
                 case AdviceCategory.Rest:
+
                     return ContainsAny(content,
-                        "descanso", "dormir", "sueño",
-                        "sueño", "horas por noche");
+                        "descanso",
+                        "dormir",
+                        "sueño",
+                        "sueno",
+                        "horas por noche");
 
                 case AdviceCategory.Activity:
+
                     return ContainsAny(content,
-                        "ejercicio", "actividad física",
-                        "actividad fisica", "pausas activas",
-                        "estiramientos", "caminar", "movimiento");
+                        "ejercicio",
+                        "actividad física",
+                        "actividad fisica",
+                        "pausas activas",
+                        "estiramientos",
+                        "caminar",
+                        "movimiento");
 
                 case AdviceCategory.GoodHabits:
+
                     return ContainsAny(content,
-                        "alimentación", "alimentacion",
-                        "meditación", "meditacion",
-                        "lectura", "conexión social",
-                        "conexion social", "apoyo",
-                        "buenos hábitos", "buenos habitos");
+                        "alimentación",
+                        "alimentacion",
+                        "meditación",
+                        "meditacion",
+                        "lectura",
+                        "conexión social",
+                        "conexion social",
+                        "apoyo",
+                        "buenos hábitos",
+                        "buenos habitos");
 
                 default:
                     return true;
@@ -450,11 +530,26 @@ namespace Pomo.Presentation.Screens
         }
 
         // =====================================================
-        // SELECCIÓN DE CONSEJO
+        // COMPROBAR SI ESTÁ EN EL PANEL INICIO
+        // =====================================================
+
+        private bool IsInicioActive()
+        {
+            return inicioPanel != null &&
+                   inicioPanel.activeInHierarchy;
+        }
+
+        // =====================================================
+        // SELECCIONAR UN CONSEJO ALEATORIO
         // =====================================================
 
         public void MostrarConsejoAleatorio()
         {
+            // Nunca mostrar consejos fuera de Inicio.
+            if (!IsInicioActive())
+                return;
+
+            // Evitar dos consejos simultáneos.
             if (currentAdvice != null)
             {
                 StopCoroutine(currentAdvice);
@@ -471,10 +566,12 @@ namespace Pomo.Presentation.Screens
             if (available.Count == 0)
                 return;
 
+            // Evitar repetir inmediatamente el mismo mensaje.
             if (available.Count > 1)
             {
                 List<AdviceMessage> different = available
-                    .Where(advice => advice.message != lastMessage)
+                    .Where(advice =>
+                        advice.message != lastMessage)
                     .ToList();
 
                 if (different.Count > 0)
@@ -482,7 +579,10 @@ namespace Pomo.Presentation.Screens
             }
 
             AdviceMessage selected =
-                available[UnityEngine.Random.Range(0, available.Count)];
+                available[UnityEngine.Random.Range(
+                    0,
+                    available.Count
+                )];
 
             lastMessage = selected.message;
 
@@ -492,11 +592,18 @@ namespace Pomo.Presentation.Screens
         }
 
         // =====================================================
-        // MOSTRAR CONSEJO Y REACCIÓN
+        // MOSTRAR CONSEJO, REACCIÓN Y SONIDO
         // =====================================================
 
         private IEnumerator ShowAdviceRoutine(AdviceMessage advice)
         {
+            if (!IsInicioActive())
+            {
+                HideAdvice();
+                currentAdvice = null;
+                yield break;
+            }
+
             SetAllReactions(false);
 
             if (normalPomo != null)
@@ -516,14 +623,29 @@ namespace Pomo.Presentation.Screens
                 adviceText.gameObject.SetActive(true);
             }
 
-            // Un único sonido para todas las categorías.
+            // Reproducir el mismo sonido para todas las categorías.
             if (adviceAudioSource != null &&
                 adviceSound != null)
             {
                 adviceAudioSource.PlayOneShot(adviceSound);
             }
 
-            yield return new WaitForSeconds(adviceDuration);
+            float elapsed = 0f;
+
+            while (elapsed < adviceDuration)
+            {
+                // Comprobar continuamente si sigue en Inicio.
+                if (!IsInicioActive())
+                {
+                    HideAdvice();
+                    currentAdvice = null;
+                    yield break;
+                }
+
+                elapsed += Time.deltaTime;
+
+                yield return null;
+            }
 
             HideAdvice();
 
@@ -531,7 +653,7 @@ namespace Pomo.Presentation.Screens
         }
 
         // =====================================================
-        // IDENTIFICAR IMAGEN DE REACCIÓN
+        // OBTENER REACCIÓN SEGÚN CATEGORÍA
         // =====================================================
 
         private GameObject GetReaction(AdviceCategory category)
@@ -562,25 +684,8 @@ namespace Pomo.Presentation.Screens
         }
 
         // =====================================================
-        // RESTAURAR POMO NORMAL
+        // OCULTAR REACCIONES
         // =====================================================
-
-        private void HideAdvice()
-        {
-            SetAllReactions(false);
-
-            if (adviceText != null)
-            {
-                adviceText.text = "";
-                adviceText.gameObject.SetActive(false);
-            }
-
-            if (adviceBackground != null)
-                adviceBackground.SetActive(false);
-
-            if (normalPomo != null)
-                normalPomo.SetActive(true);
-        }
 
         private void SetAllReactions(bool active)
         {
@@ -604,20 +709,88 @@ namespace Pomo.Presentation.Screens
         }
 
         // =====================================================
-        // APARICIÓN AUTOMÁTICA
+        // RESTAURAR POMO NORMAL
+        // =====================================================
+
+        private void HideAdvice()
+        {
+            SetAllReactions(false);
+
+            if (adviceText != null)
+            {
+                adviceText.text = "";
+                adviceText.gameObject.SetActive(false);
+            }
+
+            if (adviceBackground != null)
+                adviceBackground.SetActive(false);
+
+            if (normalPomo != null)
+                normalPomo.SetActive(true);
+        }
+
+        // =====================================================
+        // CONSEJOS AUTOMÁTICOS SOLO EN INICIO
         // =====================================================
 
         private IEnumerator AutomaticAdviceRoutine()
         {
-            yield return new WaitForSeconds(firstAdviceDelay);
+            bool wasInInicio = false;
 
             while (true)
             {
-                MostrarConsejoAleatorio();
+                // ---------------------------------------------
+                // SI NO ESTÁ EN INICIO
+                // ---------------------------------------------
 
+                if (!IsInicioActive())
+                {
+                    if (currentAdvice != null)
+                    {
+                        StopCoroutine(currentAdvice);
+                        currentAdvice = null;
+                    }
+
+                    HideAdvice();
+
+                    wasInInicio = false;
+
+                    yield return null;
+
+                    continue;
+                }
+
+                // ---------------------------------------------
+                // DETECTAR ENTRADA A INICIO
+                // ---------------------------------------------
+
+                if (!wasInInicio)
+                {
+                    wasInInicio = true;
+
+                    // Esperar antes del primer consejo.
+                    yield return new WaitForSeconds(
+                        firstAdviceDelay
+                    );
+
+                    continue;
+                }
+
+                // ---------------------------------------------
+                // MOSTRAR CONSEJO
+                // ---------------------------------------------
+
+                if (currentAdvice == null)
+                {
+                    MostrarConsejoAleatorio();
+                }
+
+                // Esperar antes del siguiente consejo.
                 yield return new WaitForSeconds(
-                    Mathf.Max(adviceInterval,
-                        adviceDuration + 1f)
+                    Mathf.Max(
+                        adviceInterval,
+                        adviceDuration + 1f
+                    )
                 );
             }
         }
