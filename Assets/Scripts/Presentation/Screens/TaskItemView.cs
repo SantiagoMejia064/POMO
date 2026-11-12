@@ -9,14 +9,13 @@ namespace Pomo.Presentation.Screens
     [DisallowMultipleComponent]
     public class TaskItemView : MonoBehaviour
     {
-        private const float DefaultPreferredHeight = 360f;
+        private const float DefaultPreferredHeight = 320f;
 
         private TMP_Text titleText;
         private TMP_Text subjectText;
         private TMP_Text dueDateText;
         private TMP_Text statusText;
         private Button startButton;
-        private Button deleteButton;
         private Button itemButton;
 
         public void Bind(
@@ -26,8 +25,7 @@ namespace Pomo.Presentation.Screens
             bool showStartButton,
             string startButtonLabel,
             Action onStartOrComplete,
-            Action onEdit,
-            Action onDelete)
+            Action onEdit)
         {
             CacheReferences();
             EnsurePreferredHeight();
@@ -39,7 +37,6 @@ namespace Pomo.Presentation.Screens
 
             ConfigureButton(itemButton, true, null, onEdit);
             ConfigureButton(startButton, showStartButton, startButtonLabel, onStartOrComplete);
-            ConfigureButton(deleteButton, true, null, onDelete);
         }
 
         private void CacheReferences()
@@ -49,7 +46,6 @@ namespace Pomo.Presentation.Screens
             dueDateText = FindComponent<TMP_Text>("DueDateText");
             statusText = FindComponent<TMP_Text>("StatusText");
             startButton = FindComponent<Button>("Comenzar");
-            deleteButton = FindComponent<Button>("Eliminar");
             itemButton = GetComponent<Button>();
         }
 

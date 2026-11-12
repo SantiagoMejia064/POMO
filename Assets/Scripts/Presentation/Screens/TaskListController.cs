@@ -68,8 +68,7 @@ namespace Pomo.Presentation.Screens
                     canStart || canComplete,
                     canStart ? "Comenzar" : "Completar",
                     () => ChangeTaskStatus(task.id, canStart ? TaskStatus.InProgress : TaskStatus.Completed),
-                    () => screenController.ShowTaskDetail(task.id),
-                    () => RequestDelete(task));
+                    () => screenController.ShowTaskDetail(task.id));
             }
         }
 
@@ -93,25 +92,6 @@ namespace Pomo.Presentation.Screens
             screenController.ShowFeedback(result == TaskStatusTransitionResult.InvalidTransition
                 ? "La tarea no puede cambiar a ese estado."
                 : "No fue posible actualizar la tarea.");
-        }
-
-        private void RequestDelete(TaskModel task)
-        {
-            screenController.ShowDeleteConfirmation(
-                task.title,
-                () => DeleteTask(task.id));
-        }
-
-        private void DeleteTask(string taskId)
-        {
-            if (!taskService.DeleteTask(taskId))
-            {
-                screenController.ShowFeedback("No fue posible eliminar la tarea.");
-                return;
-            }
-
-            screenController.ShowFeedback("Tarea eliminada correctamente.");
-            RefreshTaskList();
         }
 
         private string GetStatusLabel(TaskModel task)
