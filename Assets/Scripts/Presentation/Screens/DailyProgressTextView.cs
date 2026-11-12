@@ -172,7 +172,7 @@ namespace Pomo.Presentation.Screens
 
             int hours = totalMinutes / 60;
             int minutes = totalMinutes % 60;
-            string unit = hours > 0 ? "HR" : "MN";
+            string unit = hours > 0 ? "HR" : "MIN";
             return $"{hours:00}:{minutes:00} {unit}";
         }
     }
