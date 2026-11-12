@@ -68,6 +68,7 @@ namespace Pomo.Presentation.Screens
             public bool HasItem => item != null;
             public string ItemId => item != null ? item.ItemId : string.Empty;
             public StoreItemDefinition Item => item;
+            public Sprite PreviewSprite => itemPreviewSprite;
 
             public void ConfigureSelection(StoreInventoryController controller)
             {
@@ -117,9 +118,13 @@ namespace Pomo.Presentation.Screens
         [SerializeField] private Image inventoryCombinationPreviewImage;
         [Tooltip("Imagenes de Pomo para cada prenda o combinacion disponible.")]
         [SerializeField] private List<InventoryCombination> inventoryCombinations = new List<InventoryCombination>();
+        [Tooltip("Imagen de Pomo que muestra el atuendo equipado en Inicio.")]
+        [SerializeField] private Image homePomoImage;
 
         private StoreInventoryService inventoryService;
         private StorePurchaseService purchaseService;
+        private Sprite defaultInventorySprite;
+        private Sprite defaultHomeSprite;
         private bool initializationAttempted;
         private string selectedPreviewItemId;
         private StoreItemDefinition selectedInventoryClothing;
@@ -186,8 +191,8 @@ namespace Pomo.Presentation.Screens
         }
 
         /// <summary>
-        /// Called by an owned inventory icon. One click previews that item; a second quick
-        /// click on it previews the combination with the other selected category.
+        /// One click equips the item. A second quick click equips the combination
+        /// with the other selected category when a combination sprite exists.
         /// </summary>
         private void SelectInventoryItem(StoreItemDefinition item, Sprite itemPreviewSprite)
         {
@@ -214,11 +219,14 @@ namespace Pomo.Presentation.Screens
 
             if (isDoubleClick)
             {
-                RefreshInventoryCombinationPreview();
+                Sprite combination = FindCombinationSprite(selectedInventoryClothing, selectedInventoryAccessory);
+                EquipOutfit(combination, selectedInventoryClothing, selectedInventoryAccessory);
             }
             else
             {
-                ShowInventoryItemPreview(itemPreviewSprite);
+                EquipOutfit(itemPreviewSprite,
+                    item.Category == StoreItemCategory.Accessory ? null : item,
+                    item.Category == StoreItemCategory.Accessory ? item : null);
             }
         }
 
@@ -288,6 +296,7 @@ namespace Pomo.Presentation.Screens
 
             RefreshOwnedItemVisuals();
             RefreshInventoryItemVisuals();
+            RestoreEquippedOutfit();
         }
 
         private void Awake()
@@ -308,6 +317,9 @@ namespace Pomo.Presentation.Screens
             StoreInventoryRepository repository = new StoreInventoryRepository(new JsonStorageService(inventoryPath));
             inventoryService = new StoreInventoryService(catalog, repository);
             purchaseService = new StorePurchaseService(catalog, inventoryService, new ProgressService());
+            defaultInventorySprite = inventoryCombinationPreviewImage != null ? inventoryCombinationPreviewImage.sprite : null;
+            defaultHomeSprite = homePomoImage != null ? homePomoImage.sprite : null;
+            RestoreEquippedOutfit();
             RefreshOwnedItemVisuals();
             RefreshInventoryItemVisuals();
             ConfigureInventoryItemButtons();
@@ -383,33 +395,84 @@ namespace Pomo.Presentation.Screens
             }
         }
 
-        private void RefreshInventoryCombinationPreview()
+        private Sprite FindCombinationSprite(StoreItemDefinition clothing, StoreItemDefinition accessory)
         {
-            if (inventoryCombinationPreviewImage == null)
+            foreach (InventoryCombination combination in inventoryCombinations)
+            {
+                if (combination != null && combination.Matches(clothing, accessory))
+                {
+                    return combination.PreviewSprite;
+                }
+            }
+
+            return null;
+        }
+
+        private void EquipOutfit(Sprite sprite, StoreItemDefinition clothing, StoreItemDefinition accessory)
+        {
+            if (sprite == null || (inventoryCombinationPreviewImage == null && homePomoImage == null))
             {
                 return;
             }
 
-            foreach (InventoryCombination combination in inventoryCombinations)
+            try
             {
-                if (combination != null && combination.Matches(selectedInventoryClothing, selectedInventoryAccessory))
+                if (inventoryService.TryEquipItems(clothing?.ItemId, accessory?.ItemId))
                 {
-                    inventoryCombinationPreviewImage.sprite = combination.PreviewSprite;
-                    inventoryCombinationPreviewImage.enabled = true;
-                    return;
+                    ShowEquippedOutfit(sprite);
                 }
+            }
+            catch (LocalDataWriteException)
+            {
+                // The storage service reports the failure and keeps the previous outfit.
             }
         }
 
-        private void ShowInventoryItemPreview(Sprite itemPreviewSprite)
+        private void RestoreEquippedOutfit()
         {
-            if (inventoryCombinationPreviewImage == null || itemPreviewSprite == null)
+            if (inventoryCombinationPreviewImage == null && homePomoImage == null)
             {
                 return;
             }
 
-            inventoryCombinationPreviewImage.sprite = itemPreviewSprite;
-            inventoryCombinationPreviewImage.enabled = true;
+            var (clothingId, accessoryId) = inventoryService.GetEquippedItems();
+            InventoryItemVisual clothing = FindOwnedInventoryVisual(clothingId);
+            InventoryItemVisual accessory = FindOwnedInventoryVisual(accessoryId);
+            selectedInventoryClothing = clothing?.Item;
+            selectedInventoryAccessory = accessory?.Item;
+
+            Sprite sprite = clothing != null && accessory != null
+                ? FindCombinationSprite(clothing.Item, accessory.Item)
+                : clothing?.PreviewSprite ?? accessory?.PreviewSprite;
+            ShowEquippedOutfit(sprite);
+        }
+
+        private InventoryItemVisual FindOwnedInventoryVisual(string itemId)
+        {
+            if (!inventoryService.IsOwned(itemId))
+            {
+                return null;
+            }
+
+            return inventoryItemVisuals.Find(visual => visual != null && visual.ItemId == itemId);
+        }
+
+        private void ShowEquippedOutfit(Sprite sprite)
+        {
+            if (inventoryCombinationPreviewImage != null)
+            {
+                inventoryCombinationPreviewImage.sprite = sprite != null ? sprite : defaultInventorySprite;
+                if (sprite != null)
+                {
+                    inventoryCombinationPreviewImage.enabled = true;
+                }
+            }
+
+            if (homePomoImage != null)
+            {
+                homePomoImage.sprite = sprite != null ? sprite : defaultHomeSprite;
+                homePomoImage.preserveAspect = sprite != null;
+            }
         }
     }
 }

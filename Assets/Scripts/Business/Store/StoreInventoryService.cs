@@ -27,6 +27,23 @@ namespace Pomo.Business.Store
             return inventoryRepository.IsOwned(itemId);
         }
 
+        public (string ClothingId, string AccessoryId) GetEquippedItems()
+        {
+            return inventoryRepository.GetEquippedItems();
+        }
+
+        public bool TryEquipItems(string clothingId, string accessoryId)
+        {
+            if ((clothingId != null && !IsOwned(clothingId)) ||
+                (accessoryId != null && !IsOwned(accessoryId)))
+            {
+                return false;
+            }
+
+            inventoryRepository.SetEquippedItems(clothingId, accessoryId);
+            return true;
+        }
+
         // Invoke only after the purchase flow has successfully charged the user.
         public StoreInventoryUpdateResult RegisterAcquiredItem(string itemId)
         {

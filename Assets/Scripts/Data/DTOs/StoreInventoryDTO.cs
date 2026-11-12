@@ -7,5 +7,7 @@ namespace Pomo.Data.DTOs
     public class StoreInventoryDTO
     {
         public List<string> ownedItemIds = new List<string>();
+        public string equippedClothingId;
+        public string equippedAccessoryId;
     }
 }

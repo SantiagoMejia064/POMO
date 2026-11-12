@@ -37691,9 +37691,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 884908114}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1344c3c82d62a2a41a3576d8abb8e3ea, type: 3}
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.RawImage
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
@@ -37702,13 +37702,16 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Texture: {fileID: 2800000, guid: a0f490d19b6d0a4498793419bb9391c9, type: 3}
-  m_UVRect:
-    serializedVersion: 2
-    x: 0
-    y: 0
-    width: 1
-    height: 1
+  m_Sprite: {fileID: 21300000, guid: a0f490d19b6d0a4498793419bb9391c9, type: 3}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
 --- !u!222 &884908117
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -86496,6 +86499,7 @@ MonoBehaviour:
   - clothingItem: {fileID: 11400000, guid: 1bbb7ffe25aa8dc4bb6a57892f6944b9, type: 2}
     accessoryItem: {fileID: 11400000, guid: 7e4cb134f167317458ddab444a8d14cc, type: 2}
     previewSprite: {fileID: 21300000, guid: f3933603f55425b45bec47e04edf4cce, type: 3}
+  homePomoImage: {fileID: 884908116}
 --- !u!114 &1915654022
 MonoBehaviour:
   m_ObjectHideFlags: 0

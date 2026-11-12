@@ -26,6 +26,23 @@ namespace Pomo.Data.Repositories
             return !string.IsNullOrWhiteSpace(itemId) && inventory.ownedItemIds.Contains(itemId);
         }
 
+        public (string ClothingId, string AccessoryId) GetEquippedItems()
+        {
+            return (inventory.equippedClothingId, inventory.equippedAccessoryId);
+        }
+
+        public void SetEquippedItems(string clothingId, string accessoryId)
+        {
+            if (inventory.equippedClothingId == clothingId && inventory.equippedAccessoryId == accessoryId)
+            {
+                return;
+            }
+
+            inventory.equippedClothingId = clothingId;
+            inventory.equippedAccessoryId = accessoryId;
+            SaveChanges();
+        }
+
         public bool AddOwnedItem(string itemId)
         {
             if (string.IsNullOrWhiteSpace(itemId) || inventory.ownedItemIds.Contains(itemId))
@@ -43,6 +60,12 @@ namespace Pomo.Data.Repositories
             if (string.IsNullOrWhiteSpace(itemId) || !inventory.ownedItemIds.Remove(itemId))
             {
                 return false;
+            }
+
+            if (inventory.equippedClothingId == itemId || inventory.equippedAccessoryId == itemId)
+            {
+                inventory.equippedClothingId = null;
+                inventory.equippedAccessoryId = null;
             }
 
             SaveChanges();
